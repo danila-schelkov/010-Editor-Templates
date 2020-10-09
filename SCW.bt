@@ -1,0 +1,270 @@
+//------------------------------------------------
+//--- 010 Editor v11.0 Binary Template
+//
+//      File: SCW.bt
+//   Authors: Vorono4ka
+//   Version: 0.2
+//   Purpose: SC3D
+//  Category: Supercell
+// File Mask: *.scw
+//  ID Bytes: 53 43 33 44
+//   History: 
+//   0.2   2020-10-09 Vorono4ka: Added HEAD, GEOM, NODE
+//------------------------------------------------
+
+BigEndian();
+
+typedef struct {
+    for (j = 0; j < pointCost; j++) {
+        ushort position;
+    }
+} Point;
+
+typedef struct {
+    for (j = 0; j < 3; j++) {
+        for (l = 0; l < inputsCount; l++) {
+            switch (indexSize) {
+                case 1:
+                    ubyte index;
+                    break;
+                case 2:
+                    ushort index;
+                    break;
+            }
+        }
+    }
+} MaterialPoint;
+
+typedef struct {
+    ushort id;
+
+    if ((frameFlags & 1) != 0) {
+		ushort rotationX;
+		ushort rotationY;
+		ushort rotationZ;
+		ushort rotationW;
+	}
+
+    if ((frameFlags & 2) != 0)
+        float positionX;
+    if ((frameFlags & 4) != 0)
+        float positionY;
+    if ((frameFlags & 8) != 0)
+        float positionZ;
+
+    if ((frameFlags & 16) != 0)
+        float scaleX;
+    if ((frameFlags & 32) != 0)
+        float scaleY;
+    if ((frameFlags & 64) != 0)
+        float scaleZ;
+} Frame;
+
+typedef struct {
+    for (i = 0; i < count; i++) {
+        for (j = 0; j < 3; j++) {
+            for (l = 0; l < inputsCount; l++) {
+                switch (indexSize) {
+                    case 1:
+                        ubyte index;
+                        break;
+                    case 2:
+                        ushort index;
+                        break;
+                }
+            }
+        }
+    }
+} MaterialPoints;
+
+typedef struct {
+    short length;
+    if (length != -1) {
+        char str[length];
+    }
+} String <read=stringRead>;
+
+string stringRead(String &v) {
+    if (v.length > 0) {
+        return v.str;
+    } else {
+        return "";
+    }
+};
+
+typedef struct {
+    float segments[16];
+} Matrix4x4;
+
+typedef struct {
+    String name;
+    Matrix4x4 matrix;
+} Joint <read=jointRead>;
+
+string jointRead(Joint &v) {
+    local string s;
+    SPrintf(s, "%s", v.name.str);
+    return s;
+};
+
+typedef struct {
+    ubyte jointIds[4];
+    ushort weights[4];
+} Weight;
+
+typedef struct {
+    String name;
+    ubyte index;
+    ushort pointCost;
+    float scale;
+    uint32 count;
+    
+    for (l = 0; l < count; l++) {
+        Point point;
+    }
+} Vertex <read=vertexRead>;
+
+string vertexRead(Vertex &v) {
+    local string s;
+    SPrintf(s, "%s - %d", v.name.str, v.count);
+    return s;
+};
+
+typedef struct {
+    String name;
+    uint32 count;
+    byte inputsCount;
+    byte indexSize;
+    
+    MaterialPoints points;
+} Material <read=materialRead>;
+
+string materialRead(Material &v) {
+    local string s;
+    SPrintf(s, "%s - %d", v.name.str, v.count);
+    return s;
+};
+
+typedef struct {
+    String name;
+    String parent;
+    
+    ushort instancesCount;
+    for (i = 0; i < instancesCount; i++) {
+        char instanceName[4];
+        String targetGeometry;
+
+        ushort materialsCount;
+        for (j = 0; j < materialsCount; j++) {
+            String symbol;
+            String target;
+        }
+    }
+    
+    ushort framesCount;
+    if (framesCount > 0) {
+        ubyte frameFlags;
+        for (i = 0; i < framesCount; i++) {
+            Frame frame;
+        }
+    }
+} Node <read=nodeRead>;
+
+string nodeRead(Node &v) {
+    local string s;
+    SPrintf(s, "%s - %s", v.name.str, v.parent.str);
+    return s;
+};
+
+
+typedef struct {
+    local int i, l, j;
+
+    uint32 length;
+    char name[4];
+
+    switch (name) {
+        case "HEAD":
+            ushort version;
+            ushort frameRate;
+            ushort unk2;
+            ushort animationFrameEnd;
+            String materialsFilename;
+            if ( version == 2 ) {
+                byte unkBool;
+            }
+
+            fileVersion = (byte) version;
+
+            break;
+        // case "MATE":
+        //     break;
+        case "GEOM":
+            String geometryName;
+            String geometryGroupName;
+
+            if (fileVersion <= 1) {
+                Matrix4x4 unk;
+            }
+
+            ubyte verticesCount;
+            for (i = 0; i < verticesCount; i++)
+                Vertex vertex;
+
+            ubyte hasBindMatrix;
+            if (hasBindMatrix == 1) 
+                Matrix4x4 bindMatrix;
+            
+            ubyte jointsCount;
+            for (i = 0; i < jointsCount; i++)
+                Joint joint;
+
+            uint32 weightsCount;
+            for (i = 0; i < weightsCount; i++)
+                Weight weight;
+
+            ubyte materialsCount;
+            for (i = 0; i < materialsCount; i++)
+                Material material;
+
+            break;
+        // case "CAME":
+        //     Printf("Header detected.");
+        //     break;
+        case "NODE":
+            ushort nodesCount;
+            for (i = 0; i < nodesCount; i++)
+                Node node;
+            break;
+        case "WEND":
+            Printf("EoF detected.");
+            break;
+        default:
+            char skip[length];
+            break;
+    }
+    uint crc32;
+} Chunk <read=chunkRead, comment=chunkComment>;
+
+string chunkComment(Chunk &v) {
+    local string s;
+    SPrintf(s, "%x", v.crc32);
+    return s;
+};
+
+string chunkRead(Chunk &v) {
+    local string s;
+    SPrintf(s, "%s - %d", v.name, v.length);
+    return s;
+};
+
+
+struct FILE {
+    local byte fileVersion;
+
+    char magic[4];
+
+    while (!FEof()) {
+        Chunk chunk;
+    }
+} file;
