@@ -3,19 +3,72 @@
 //
 //      File: SCW.bt
 //   Authors: Vorono4ka
-//   Version: 0.2
-//   Purpose: SC3D
-//  Category: Supercell
+//   Version: 0.4
+//   Purpose: SC3D 3D file format template (Supercell).
+//  Category: GIS
 // File Mask: *.scw
 //  ID Bytes: 53 43 33 44
 //   History: 
+//   0.4   2020-10-12 Vorono4ka: Added CAME, MATE
+//   0.3   2020-10-10 Vorono4ka: Fixed a bug with breaking the template due to several materials + fixed the display of Node
 //   0.2   2020-10-09 Vorono4ka: Added HEAD, GEOM, NODE
 //------------------------------------------------
 
 BigEndian();
 
+// Types
 typedef struct {
-    for (j = 0; j < pointCost; j++) {
+    short length;
+    if (length != -1) {
+        char str[length];
+    }
+} String <read=stringRead>;
+
+string stringRead(String &v) {
+    if (v.length > 0) {
+        return v.str;
+    } else {
+        return "";
+    }
+};
+
+typedef struct {
+    float segments[16];
+} Matrix4x4;
+
+typedef struct {
+    ubyte a;
+    ubyte r;
+    ubyte g;
+    ubyte b;
+} ARGB <read=ARGBRead>;
+
+string ARGBRead(ARGB &v) {
+    string s;
+    SPrintf(s, "#%x%x%x %d", v.r, v.g, v.b, v.a);
+    return s;
+}
+
+// Structures
+typedef struct {
+    byte useTexture;
+    if (useTexture == 1) 
+        String parameter;
+    else
+        ARGB parameter;
+} GLParameter <read=GLParameterRead>;
+
+string GLParameterRead(GLParameter &v) {
+    string s;
+    if (v.useTexture == 1) 
+        s = stringRead(v.parameter);
+    else
+        s = ARGBRead(v.parameter);
+    return s;
+}
+
+typedef struct {
+    for (l = 0; l < stride; l++) {
         ushort position;
     }
 } Point;
@@ -38,32 +91,32 @@ typedef struct {
 typedef struct {
     ushort id;
 
-    if ((frameFlags & 1) != 0) {
+    if ((_frameFlags & 1) != 0) {
 		ushort rotationX;
 		ushort rotationY;
 		ushort rotationZ;
 		ushort rotationW;
 	}
 
-    if ((frameFlags & 2) != 0)
+    if ((_frameFlags & 2) != 0)
         float positionX;
-    if ((frameFlags & 4) != 0)
+    if ((_frameFlags & 4) != 0)
         float positionY;
-    if ((frameFlags & 8) != 0)
+    if ((_frameFlags & 8) != 0)
         float positionZ;
 
-    if ((frameFlags & 16) != 0)
+    if ((_frameFlags & 16) != 0)
         float scaleX;
-    if ((frameFlags & 32) != 0)
+    if ((_frameFlags & 32) != 0)
         float scaleY;
-    if ((frameFlags & 64) != 0)
+    if ((_frameFlags & 64) != 0)
         float scaleZ;
 } Frame;
 
 typedef struct {
     for (i = 0; i < count; i++) {
-        for (j = 0; j < 3; j++) {
-            for (l = 0; l < inputsCount; l++) {
+        for (l = 0; l < 3; l++) {
+            for (j = 0; j < inputsCount; j++) {
                 switch (indexSize) {
                     case 1:
                         ubyte index;
@@ -76,25 +129,6 @@ typedef struct {
         }
     }
 } MaterialPoints;
-
-typedef struct {
-    short length;
-    if (length != -1) {
-        char str[length];
-    }
-} String <read=stringRead>;
-
-string stringRead(String &v) {
-    if (v.length > 0) {
-        return v.str;
-    } else {
-        return "";
-    }
-};
-
-typedef struct {
-    float segments[16];
-} Matrix4x4;
 
 typedef struct {
     String name;
@@ -115,11 +149,12 @@ typedef struct {
 typedef struct {
     String name;
     ubyte index;
-    ushort pointCost;
+    ubyte subIndex;
+    ubyte stride;
     float scale;
     uint32 count;
     
-    for (l = 0; l < count; l++) {
+    for (i = 0; i < count; i++) {
         Point point;
     }
 } Vertex <read=vertexRead>;
@@ -127,6 +162,30 @@ typedef struct {
 string vertexRead(Vertex &v) {
     local string s;
     SPrintf(s, "%s - %d", v.name.str, v.count);
+    return s;
+};
+
+typedef struct {
+    ubyte count;
+    for (i = 0; i < count; i++)
+        Joint joint;
+} Joints <read=jointsRead>;
+
+string jointsRead(Joints &v) {
+    local string s;
+    SPrintf(s, "Count: %d", v.count);
+    return s;
+};
+
+typedef struct {
+    uint32 count;
+    for (i = 0; i < count; i++)
+        Weight weight;
+} Weights <read=weightsRead>;
+
+string weightsRead(Weights &v) {
+    local string s;
+    SPrintf(s, "Count: %d", v.count);
     return s;
 };
 
@@ -146,18 +205,28 @@ string materialRead(Material &v) {
 };
 
 typedef struct {
+    local byte _frameFlags;
+
     String name;
     String parent;
     
     ushort instancesCount;
     for (i = 0; i < instancesCount; i++) {
-        char instanceName[4];
-        String targetGeometry;
-
-        ushort materialsCount;
-        for (j = 0; j < materialsCount; j++) {
-            String symbol;
-            String target;
+        char instanceType[4];
+        String targetObject;
+        
+        switch (instanceType) {
+            case "GEOM":
+            case "CONT":
+                ushort materialsCount;
+                for (l = 0; l < materialsCount; l++) {
+                    String symbol;
+                    String target;
+                }
+                break;
+            case "CAME":
+                String target;
+                break;
         }
     }
     
@@ -165,6 +234,10 @@ typedef struct {
     if (framesCount > 0) {
         ubyte frameFlags;
         for (i = 0; i < framesCount; i++) {
+            if (i == 0) 
+                _frameFlags = 127;
+            else
+                _frameFlags = frameFlags;
             Frame frame;
         }
     }
@@ -172,12 +245,16 @@ typedef struct {
 
 string nodeRead(Node &v) {
     local string s;
-    SPrintf(s, "%s - %s", v.name.str, v.parent.str);
+    SPrintf(s, "%s", v.name.str);
+    if (v.parent.length > 0) {
+        SPrintf(s, "%s - %s", v.name.str, v.parent.str);
+    }
     return s;
 };
 
 
 typedef struct {
+    local int _i, _l, _j;
     local int i, l, j;
 
     uint32 length;
@@ -197,8 +274,36 @@ typedef struct {
             fileVersion = (byte) version;
 
             break;
-        // case "MATE":
-        //     break;
+        case "MATE":
+            String materialName;
+            String shaderFile;
+
+            ubyte unk;
+            ubyte unk;
+
+            ARGB ambientColor;
+
+            GLParameter diffuse;
+            GLParameter specular;
+
+            String unk;
+            String unk;
+
+            GLParameter colorize;
+            GLParameter emission;
+
+            String opacityTexture;
+
+            float unk;
+            float unk;
+
+            String diffuseLightmap;
+            String specularLightmap;
+            
+            if (fileVersion == 2) 
+                String unk;
+            int shaderDefineFlags;
+            break;
         case "GEOM":
             String geometryName;
             String geometryGroupName;
@@ -208,32 +313,34 @@ typedef struct {
             }
 
             ubyte verticesCount;
-            for (i = 0; i < verticesCount; i++)
+            for (_i = 0; _i < verticesCount; _i++)
                 Vertex vertex;
 
             ubyte hasBindMatrix;
             if (hasBindMatrix == 1) 
                 Matrix4x4 bindMatrix;
-            
-            ubyte jointsCount;
-            for (i = 0; i < jointsCount; i++)
-                Joint joint;
 
-            uint32 weightsCount;
-            for (i = 0; i < weightsCount; i++)
-                Weight weight;
+            Joints joints;
+
+            Weights weights;
 
             ubyte materialsCount;
-            for (i = 0; i < materialsCount; i++)
+            for (_i = 0; _i < materialsCount; _i++) {
                 Material material;
+            }
 
             break;
-        // case "CAME":
-        //     Printf("Header detected.");
-        //     break;
+        case "CAME":
+            String cameraName;
+            float unk;
+            float xFov;
+            float aspectRatio;
+            float zNear;
+            float zFar;
+            break;
         case "NODE":
             ushort nodesCount;
-            for (i = 0; i < nodesCount; i++)
+            for (_i = 0; _i < nodesCount; _i++)
                 Node node;
             break;
         case "WEND":
