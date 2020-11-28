@@ -1,0 +1,47 @@
+//------------------------------------------------
+//--- 010 Editor v7.0 Binary Template
+//
+//      File: SCP.bt
+//   Authors: Vorono4ka
+//   Version: 0.2
+//   Purpose: Supercell pack file
+//  Category: Misc
+// File Mask: *.scp
+//  ID Bytes: 53 43 50 //SCP
+//   History: 
+//------------------------------------------------
+
+LittleEndian();
+
+typedef struct {
+    short unk[2];
+    int64 fileLength;
+    int64 fileOffset;
+    int64 outputLength;
+    char hash[32];
+    string filename;
+
+    local int off = FTell();
+    FSeek(fileOffset);
+        
+    char data[fileLength];
+
+    FSeek(off);
+} fileInfo <read=fileInfoRead>;
+
+string fileInfoRead(fileInfo &v) {
+    return v.filename;
+};
+
+struct file {
+    char MAGIC[4];
+
+    int unk;
+    int unk;
+    int filesCount;
+    int infoOffset;
+    FSeek(infoOffset);
+    while (!FEof()) {
+        fileInfo info;
+    }
+} File;
