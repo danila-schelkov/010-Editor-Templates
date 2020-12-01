@@ -3,18 +3,19 @@
 //
 //      File: SCP.bt
 //   Authors: Vorono4ka
-//   Version: 0.2
+//   Version: 0.3
 //   Purpose: Supercell pack file
 //  Category: Misc
 // File Mask: *.scp
-//  ID Bytes: 53 43 50 //SCP
+//  ID Bytes: 53 43 50 21 // SCP!
 //   History: 
 //------------------------------------------------
 
 LittleEndian();
 
 typedef struct {
-    short unk[2];
+    short unk; // Maybe the hash length, but devided by 2
+    short filenameLength;
     int64 fileLength;
     int64 fileOffset;
     int64 outputLength;
@@ -39,7 +40,14 @@ struct file {
     int unk;
     int unk;
     int filesCount;
-    int infoOffset;
+    int64 infoOffset;
+    int64 infoLength; // Maybe offset from the end
+    int64 infoLength;
+    int64 unk;
+    int64 unk;
+    int64 unk;
+    int64 unk;
+    string infoSha;
     FSeek(infoOffset);
     while (!FEof()) {
         fileInfo info;
