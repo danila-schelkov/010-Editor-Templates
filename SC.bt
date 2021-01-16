@@ -1,0 +1,399 @@
+//------------------------------------------------
+//--- 010 Editor v11.0 Binary Template
+//
+//      File: SC.bt
+//   Authors: Vorono4ka
+//   Version: 0.6
+//   Purpose: SWF file format template (Supercell). This file format is compressed by lzma or lzham! Decompress it for use this template
+//  Category: Misc
+// File Mask: *.sc
+//  ID Bytes: 
+//   History: 
+//   0.6   2021-01-16 Vorono4ka: Added reading of all tags in the file.
+//------------------------------------------------
+
+LittleEndian();
+
+typedef struct {
+    ubyte length;
+    if (length != 255) {
+        char str[length];
+    }
+} String <read=stringRead>;
+
+string stringRead(String &v) {
+    if (v.length > 0 && v.length != 255) {
+        return v.str;
+    } else {
+        return "";
+    }
+};
+
+typedef struct {
+    int32 x;
+    int32 y;
+} TwipPoint <read=twipPointRead>;
+
+string twipPointRead(TwipPoint &v) {
+    local string s;
+    SPrintf(s, "%d, %d", v.x / 20, v.y / 20);
+    return s;
+}
+
+typedef struct {
+    ushort x;
+    ushort y;
+} Point <read=pointRead>;
+
+string pointRead(Point &v) {
+    local string s;
+    SPrintf(s, "%d, %d", v.x, v.y);
+    return s;
+}
+
+
+typedef struct {
+    for (i = 0; i < exportCount; i++) {
+        ushort id;
+    }
+} ExportIds;
+    
+typedef struct {
+    for (i = 0; i < exportCount; i++) {
+        String name;
+    }
+} ExportNames;
+    
+
+// Textures
+typedef struct {
+    ubyte pixelType;
+    ushort width;
+    ushort height;
+    
+    if (hasTexture) {
+        byte pixels[length - 5];
+    }
+} SWFTexture;
+    
+
+// Shapes
+typedef struct {
+    ubyte textureId;
+
+    if (tag != 4) {
+        ubyte pointsCount;
+    } else {
+        local ubyte pointsCount = 4;
+    }
+
+    for (i = 0; i < pointsCount; i++) {
+        TwipPoint point;
+    }
+
+    for (i = 0; i < pointsCount; i++) {
+        Point point;
+    }
+} ShapeDrawBitmapCommand;
+
+typedef struct {
+    while (true)
+    {
+        byte shapeDrawBitmapTag;
+        uint32 shapeDrawBitmapLength;
+
+        switch (shapeDrawBitmapTag)
+        {
+            case 0:
+                return;
+            case 6:
+                Printf("SupercellSWF::TAG_SHAPE_DRAW_COLOR_FILL_COMMAND not supported");
+                break;
+            case 4:
+            case 17:
+            case 22:
+                ShapeDrawBitmapCommand shapeDrawBitmapCommand;
+                break;
+            default:
+                byte skip[shapeDrawBitmapLength];
+                break;
+        }
+    }
+} ShapeCommands;
+
+typedef struct {
+    ushort id;
+    ushort regionsCount;
+    
+    if (tag == 18) {
+        ushort pointsCount;
+    }
+
+    ShapeCommands commands;
+} Shape;
+
+
+// MovieClips
+typedef struct {
+    ushort id;
+    ushort matrixId;
+    ushort colorTransformId;
+} Transform;
+
+typedef struct {
+    for (i = 0; i < transformsCount; i++)
+    {
+        Transform transform;
+    }
+} Transforms;
+
+typedef struct {
+    for (i = 0; i < bindsCount; i++)
+    {
+        short bindId;
+    }
+
+    if (tag == 12)
+    {
+        for (i = 0; i < bindsCount; i++)
+        {
+            byte blend;
+        }
+    }
+
+    for (i = 0; i < bindsCount; i++)
+    {
+        String bindName;
+    }
+} Binds;
+
+typedef struct {
+    short id;
+    String name;
+} MovieClipFrame;
+
+typedef struct {
+    while (true)
+    {
+        while (true)
+        {
+            byte movieClipFrameTag;
+            int movieClipFrameLength;
+
+            if (movieClipFrameLength < 0)
+            {
+                Printf("Negative tag length in MovieClip. Tag %d\n", movieClipFrameTag);
+            }
+
+            if (movieClipFrameTag != 11)
+                break;
+            MovieClipFrame movieClipFrame;
+        }
+
+        if (movieClipFrameTag == 0)
+            break;
+        if (movieClipFrameTag == 5)
+        {
+            Printf("TAG_MOVIE_CLIP_FRAME no longer supported\n");
+        }
+        else
+        {
+            Printf("Unknown tag in MovieClip, %d\n", movieClipFrameTag);
+        }
+
+        FSkip(movieClipFrameLength);
+    }
+} MovieClipFrames;
+
+typedef struct {
+    ushort id;
+    ubyte fps;
+    ushort framesCount;
+
+    switch (tag)
+    {
+        case 14:
+            Printf("TAG_MOVIE_CLIP_4 no longer supported\n");
+            break;
+        case 3:
+            Printf("TAG_MOVIE_CLIP no longer supported\n");
+            break;
+        default:
+            int32 transformsCount;
+            Transforms transforms;
+            break;
+    }
+
+    ushort bindsCount;
+    Binds binds;
+
+    MovieClipFrames frames;
+} MovieClip;
+
+
+// TextFields
+typedef struct {
+    short id;
+    String fontName;
+    int32 unk;
+    
+    byte unk;  // bool
+    byte unk;  // bool
+    byte unk;  // bool
+    byte unk;  // bool
+
+    byte unk;
+    byte unk;
+    short unk;
+    short unk;
+    short unk;
+    short unk;
+    
+    byte unk;  // bool
+    
+    String unk;
+
+    if (tag == 7) return;
+    
+    byte unk;  // bool
+    switch (tag)
+    {
+        case 25:
+            int32 unk;
+            return;
+        case 21:
+            int32 unk;
+            return;
+        case 20:
+            return;
+    }
+    if (tag >= 33)
+    {
+        int32 unk;
+        short unk;
+        short unk;
+
+        if ((uint) (tag - 43) <= 1)
+        {
+            short unk;
+        }
+
+        if (tag == 44)
+        {
+            byte unk;  // bool
+        }
+    }
+} TextField;
+
+
+typedef struct {
+    ubyte tag;
+    uint length;
+
+    switch (tag) {
+        case 0:
+            return;
+        case 26:
+            hasTexture = 0;
+            break;
+        case 1:
+            SWFTexture texture;
+            break;
+        case 2:
+        case 18:
+            Shape shape;
+            break;
+        case 3:
+        case 10:
+        case 12:
+        case 14:
+            MovieClip movieClip;
+            break;
+        case 7:
+        case 33:
+        case 44:
+            TextField textField;
+            break;
+        default:
+            byte skip[length];
+            break;
+    }
+} Tag <read=tagRead, comment=tagComment>;
+
+string tagRead(Tag &v) {
+    local string s;
+    SPrintf(s, "%d, Length: %d", v.tag, v.length);
+    return s;
+};
+
+string tagComment(Tag &v) {
+    local string type, s;
+
+    switch (v.tag) {
+        case 0:
+            return s;
+        case 1:
+            type = "Texture";
+            break;
+        case 2:
+        case 18:
+            type = "Shape";
+            break;
+        case 3:
+        case 10:
+        case 12:
+        case 14:
+            type = "MovieClip";
+            break;
+        case 7:
+        case 33:
+        case 44:
+            type = "TextField";
+            break;
+        case 8:
+            type = "Matrix";
+            break;
+        case 9:
+            type = "Color Transform";
+            break;
+        default:
+            type = "Unknown";
+            break;
+    }
+
+    SPrintf(s, "Type: %s", type);
+    return s;
+};
+
+
+typedef struct {
+    while (!FEof()) {
+        Tag tag;
+    }
+} Tags;
+
+
+struct FILE {
+    local string fileName = FileNameGetBase(GetFileName());
+    local int isTexture = RegExMatch(fileName, ".*_tex.sc");
+    local int hasTexture = 1;
+    local int i, l;
+
+    if (!isTexture) {
+        ushort shapeCount;
+        ushort animationsCount;
+        ushort texturesCount;
+        ushort textFieldsCount;
+        ushort matricesCount;
+        ushort colorTransformsCount;
+    
+        ushort unusedBytes[2];
+        ubyte unusedBytes;
+    
+        ushort exportCount;
+        ExportIds exportIds;
+        ExportNames exportNames;
+    }
+
+    Tags tags; // LoadTags
+} file;
