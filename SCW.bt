@@ -19,7 +19,7 @@ BigEndian();
 // Types
 typedef struct {
     short length;
-    if (length != -1) {
+    if (length > 0) {
         char str[length];
     }
 } String <read=stringRead>;
@@ -264,8 +264,8 @@ typedef struct {
         case "HEAD":
             ushort version;
             ushort frameRate;
-            ushort unk2;
-            ushort animationFrameEnd;
+            ushort animationStartFrame;
+            ushort animationEndFrame;
             String materialsFilename;
             if ( version == 2 ) {
                 byte unkBool;
@@ -303,6 +303,9 @@ typedef struct {
             if (fileVersion == 2) 
                 String unk;
             int shaderDefineFlags;
+
+            if (shaderDefineFlags & 32768) 
+                float unk1[4];
             break;
         case "GEOM":
             String geometryName;
