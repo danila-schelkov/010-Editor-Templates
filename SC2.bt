@@ -58,6 +58,7 @@ int GoToField(uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
     
     local int16 fieldOffset = vtable.fieldOffsets[fieldIndex];
+    Printf("fieldIndex: %d, fieldOffset: %d\n", fieldIndex, fieldOffset);
     if (fieldOffset == 0) {
         return false;
     }
@@ -154,46 +155,60 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
 } Int32Vector;
 
 typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    local uint position = FTell();
     if (GoToField(rootTablePosition, vtable, fieldIndex)) {
         byte value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
     }
 } Int8 <read=value>;
 
 typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    local uint position = FTell();
     if (GoToField(rootTablePosition, vtable, fieldIndex)) {
         ubyte value;
+        FSeek(position);
     } else {
         local string value = "Value is not present";
     }
 } UInt8 <read=value>;
 
 typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    local uint position = FTell();
     if (GoToField(rootTablePosition, vtable, fieldIndex)) {
         int16 value;
+        FSeek(position);
     } else {
         local string value = "Value is not present";
     }
 } Int16 <read=value>;
 
 typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    local uint position = FTell();
     if (GoToField(rootTablePosition, vtable, fieldIndex)) {
         uint16 value;
+        FSeek(position);
     } else {
         local string value = "Value is not present";
     }
 } UInt16 <read=value>;
 
 typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    local uint position = FTell();
     if (GoToField(rootTablePosition, vtable, fieldIndex)) {
         int32 value;
+        FSeek(position);
     } else {
         local string value = "Value is not present";
     }
 } Int32 <read=value>;
 
 typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    local uint position = FTell();
     if (GoToField(rootTablePosition, vtable, fieldIndex)) {
-        uint16 value;
+        uint32 value;
+        FSeek(position);
     } else {
         local string value = "Value is not present";
     }
