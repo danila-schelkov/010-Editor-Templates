@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 0.3
+//   Version: 0.4
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   0.4   2024-11-01 Vorono4ka: Parsing rectangles from headers
 //   0.3   2024-11-01 Vorono4ka: String parsing from headers
 //   0.2   2024-11-01 Vorono4ka: Reading movie clip modifiers
 //   0.1   2024-11-01 Vorono4ka: Work on SC2 started... Reading textures section
@@ -139,6 +140,14 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
     FSeek(base.nextPosition);
 } Int32Vector;
 
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    
+    uint32 count;
+    float array[count];
+    FSeek(base.nextPosition);
+} FloatVector;
+
 typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     local uint position = FTell();
     if (GoToField(rootTablePosition, vtable, fieldIndex)) {
@@ -198,6 +207,16 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
         local string value = "Value is not present";
     }
 } UInt32 <read=value>;
+
+typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    local uint position = FTell();
+    if (GoToField(rootTablePosition, vtable, fieldIndex)) {
+        float value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} Float <read=value>;
 
 typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     StructBase base(rootTablePosition, vtable, fieldIndex);
@@ -267,12 +286,42 @@ string StringVectorRead(StringVector& v) {
 }
 
 typedef struct {
+    ubyte redAddition;
+    ubyte greenAddition;
+    ubyte blueAddition;
+
+    ubyte alpha;
+
+    ubyte redMultiplier;
+    ubyte greenMultiplier;
+    ubyte blueMultiplier;
+} ColorTransform <size=(7*sizeof(ubyte))>;
+
+typedef struct {
+    float left, top, right, bottom;
+} Rect<read=RectRead>;
+
+string RectRead(Rect& v) {
+    local string s;
+    SPrintf(s, "%.2f, %.2f, %.2f, %.2f", v.left, v.top, v.right, v.bottom);
+    return s;
+};
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    
+    uint32 count;
+    Rect array[count];
+    FSeek(base.nextPosition);
+} RectVector;
+
+typedef struct {
     RootTable rootTable;
     
     StringVector strings(rootTable, 0);
     Vector unk2(rootTable, 1);
     Vector unk3(rootTable, 2);
-    Vector unk4(rootTable, 3);  // 16 bytes align (stride)
+    RectVector scalingGrids(rootTable, 3);  // 16 bytes align (stride). Perhaps, used as scalingGrids
     MovieClipFrameElementVector movieClipFrameElements(rootTable, 4);
     Vector unk6(rootTable, 5);
     Vector unk7(rootTable, 6);
