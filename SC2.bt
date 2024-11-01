@@ -3,19 +3,22 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 0.1
+//   Version: 0.3
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   0.3   2024-11-01 Vorono4ka: String parsing from headers
+//   0.2   2024-11-01 Vorono4ka: Reading movie clip modifiers
 //   0.1   2024-11-01 Vorono4ka: Work on SC2 started... Reading textures section
 //------------------------------------------------
 
 typedef struct {
     local uint startPosition = FTell();
     
-    uint offset;
+    uint32 offset;
+    local uint nextPosition = FTell();
     local uint position = startPosition + offset;
     
     FSeek(position);
@@ -110,25 +113,7 @@ string VectorRead(Vector &v) {
     return s;
 };
 
-typedef struct {
-    ushort childIndex;
-    ushort matrixIndex;
-    ushort colorTransformIndex;
-} MovieClipFrameElement <read=frameElementRead, size=(3*sizeof(ushort))>;
-
-string frameElementRead(MovieClipFrameElement &v) {
-    local string s;
-    SPrintf(s, "%d - %d, %d", v.childIndex, v.matrixIndex, v.colorTransformIndex);
-    return s;
-};
-
-typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
-    
-    uint32 count;
-    MovieClipFrameElement array[count / 3];
-    FSeek(base.nextPosition);
-} MovieClipFrameElementVector;
+// Built-in types
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
     StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
@@ -228,10 +213,63 @@ string ByteArrayRead(ByteArray& v) {
     return s;
 }
 
+// 
+
+typedef struct {
+    ushort childIndex;
+    ushort matrixIndex;
+    ushort colorTransformIndex;
+} MovieClipFrameElement <read=frameElementRead, size=(3*sizeof(ushort))>;
+
+string frameElementRead(MovieClipFrameElement &v) {
+    local string s;
+    SPrintf(s, "%d - %d, %d", v.childIndex, v.matrixIndex, v.colorTransformIndex);
+    return s;
+};
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    
+    uint32 count;
+    MovieClipFrameElement array[count / 3];
+    FSeek(base.nextPosition);
+} MovieClipFrameElementVector;
+
+typedef struct {
+    Indirect descriptor;
+    
+    uint32 length;
+    char text[length];
+    
+    FSeek(descriptor.nextPosition);
+} String<read=StringRead, size=4>;
+
+string StringRead(String& v) {
+    if (v.length == 0) {
+        return "";
+    }
+    
+    return v.text;
+}
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    
+    uint32 count;
+    String array[count] <optimize=false>;
+    FSeek(base.nextPosition);
+} StringVector <read=StringVectorRead>;
+
+string StringVectorRead(StringVector& v) {
+    local string s; 
+    SPrintf(s, "Count: %d", v.count); 
+    return s;
+}
+
 typedef struct {
     RootTable rootTable;
     
-    Int32Vector unk1(rootTable, 0);
+    StringVector strings(rootTable, 0);
     Vector unk2(rootTable, 1);
     Vector unk3(rootTable, 2);
     Vector unk4(rootTable, 3);  // 16 bytes align (stride)
@@ -254,6 +292,8 @@ typedef struct {
 typedef struct {
     RootTable rootTable;
 } ShapesRoot <bgcolor=0x00FF00>;
+
+// Modifiers
 
 typedef struct {
     ushort id;
@@ -365,6 +405,7 @@ struct DataChunk (uint i) {
             break;
         default:
             char data[length];
+            break;
     }
     
     FSeek(position + length);
