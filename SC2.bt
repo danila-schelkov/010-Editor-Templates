@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 0.4
+//   Version: 0.5
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   0.5   2024-11-02 Vorono4ka: Parsing shapes and shape commands
 //   0.4   2024-11-01 Vorono4ka: Parsing rectangles from headers
 //   0.3   2024-11-01 Vorono4ka: String parsing from headers
 //   0.2   2024-11-01 Vorono4ka: Reading movie clip modifiers
