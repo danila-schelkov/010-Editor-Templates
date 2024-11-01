@@ -256,7 +256,28 @@ typedef struct {
 } ShapesRoot <bgcolor=0x00FF00>;
 
 typedef struct {
+    ushort id;
+    ushort type;
+} MovieClipModifier<read=MovieClipModifierRead>;
+
+string MovieClipModifierRead(MovieClipModifier& v) {
+    string s;
+    SPrintf(s, "Modifier (%d) #%d", v.type, v.id);
+    return s;
+}
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    
+    uint32 count;
+    MovieClipModifier array[count];
+    FSeek(base.nextPosition);
+} MovieClipModifierVector;
+
+typedef struct {
     RootTable rootTable;
+    
+    MovieClipModifierVector modifiers(rootTable, 0);
 } MovieClipModifiersRoot <bgcolor=0x00FF00>;
 
 typedef struct {
