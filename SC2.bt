@@ -18,11 +18,9 @@
 typedef struct {
     local uint startPosition = FTell();
     
-    uint32 offset;
+    local int32 offset = ReadInt(startPosition);
     local uint nextPosition = FTell();
     local uint position = startPosition + offset;
-    
-    FSeek(position);
 } Indirect<read=IndirectRead>;
 
 string IndirectRead(Indirect &v) {
@@ -174,7 +172,7 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
         int16 value;
         FSeek(position);
     } else {
-        local string value = "Value is not present";
+        local int16 value = 0; // "Value is not present";
     }
 } Int16 <read=value>;
 
@@ -184,7 +182,7 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
         uint16 value;
         FSeek(position);
     } else {
-        local string value = "Value is not present";
+        local uint16 value = 0; // "Value is not present";
     }
 } UInt16 <read=value>;
 
@@ -256,6 +254,8 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
 
 typedef struct {
     Indirect descriptor;
+    
+    FSeek(descriptor.position);
     
     uint32 length;
     char text[length];
@@ -339,7 +339,57 @@ typedef struct {
 } TextFieldsRoot <bgcolor=0x0000FF>;
 
 typedef struct {
+    uint unk1; // always 0
+    if (unk1 != 0) return;
+    uint textureIndex;
+    uint pointCount;
+    uint startingPointIndex;
+} ShapeDrawBitmapCommand<read=ShapeDrawBitmapCommandRead>;
+
+string ShapeDrawBitmapCommandRead(ShapeDrawBitmapCommand& v) {
+    local string s;
+    SPrintf(s, "CMD (TX: %d): %d+%d", v.textureIndex, v.startingPointIndex, v.pointCount);
+    return s;
+}
+
+typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    StructBase base(rootTablePosition, vtable, fieldIndex);
+    
+    int32 count;
+    ShapeDrawBitmapCommand array[count];
+    FSeek(base.nextPosition);
+} ShapeDrawBitmapCommandVector;
+
+typedef struct {
+    Indirect descriptor;
+    
+    FSeek(descriptor.position);
+    VTable vtable;
+    
+    UInt16 id(descriptor.position, vtable, 0);
+    ShapeDrawBitmapCommandVector commands(descriptor.position, vtable, 1);
+    
+    FSeek(descriptor.nextPosition);
+} Shape<read=ShapeRead, size=4>;
+
+string ShapeRead(Shape& v) {
+    string s;
+    SPrintf(s, "Shape #%d (%d commands)", v.id.value, v.commands.count);
+    return s;
+}
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    
+    uint32 count;
+    Shape array[count] <optimize=false>;
+    FSeek(base.nextPosition);
+} ShapeVector;
+
+typedef struct {
     RootTable rootTable;
+    
+    ShapeVector shapes(rootTable, 0);
 } ShapesRoot <bgcolor=0x00FF00>;
 
 // Modifiers
