@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 0.6
+//   Version: 0.7
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   0.7   2024-11-02 Vorono4ka: Parsing matrix banks
 //   0.6   2024-11-02 Vorono4ka: Parsing movie clips
 //   0.5   2024-11-02 Vorono4ka: Parsing shapes and shape commands
 //   0.4   2024-11-01 Vorono4ka: Parsing rectangles from headers
@@ -299,18 +300,6 @@ string StringVectorRead(StringVector& v) {
 }
 
 typedef struct {
-    ubyte redAddition;
-    ubyte greenAddition;
-    ubyte blueAddition;
-
-    ubyte alpha;
-
-    ubyte redMultiplier;
-    ubyte greenMultiplier;
-    ubyte blueMultiplier;
-} ColorTransform <size=(7*sizeof(ubyte))>;
-
-typedef struct {
     float left, top, right, bottom;
 } Rect<read=RectRead>;
 
@@ -328,6 +317,80 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
     FSeek(base.nextPosition);
 } RectVector;
 
+// Matrices and color transformations
+
+typedef struct {
+    float a, b, c, d, x, y;
+} Matrix2x3 <read=Matrix2x3Read, size=(6*sizeof(float))>;
+
+string Matrix2x3Read(Matrix2x3& v) {
+    local string s;
+    SPrintf(s, "%.2f %.2f %.2f %.2f %.2f %.2f", ReadFloat(startof(v)), ReadFloat(startof(v)+sizeof(float)), ReadFloat(startof(v)+sizeof(float)*2), ReadFloat(startof(v)+sizeof(float)*3), ReadFloat(startof(v)+sizeof(float)*4), ReadFloat(startof(v)+sizeof(float)*5));
+    return s;
+};
+
+typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    StructBase base(rootTablePosition, vtable, fieldIndex);
+    
+    uint32 count;
+    Matrix2x3 array[count];
+    FSeek(base.nextPosition);
+} Matrix2x3Vector;
+
+typedef struct {
+    ubyte redAddition;
+    ubyte greenAddition;
+    ubyte blueAddition;
+
+    ubyte alpha;
+
+    ubyte redMultiplier;
+    ubyte greenMultiplier;
+    ubyte blueMultiplier;
+} ColorTransform <read=ColorTransformRead, size=(7*sizeof(ubyte))>;
+
+string ColorTransformRead(ColorTransform& v) {
+    local string s;
+    local ubyte ra = ReadUByte(startof(v)+sizeof(ubyte));
+    local ubyte ga = ReadUByte(startof(v)+sizeof(ubyte)*1);
+    local ubyte ba = ReadUByte(startof(v)+sizeof(ubyte)*2);
+    local ubyte a = ReadUByte(startof(v)+sizeof(ubyte)*3);
+    local ubyte r = ReadUByte(startof(v)+sizeof(ubyte)*4);
+    local ubyte g = ReadUByte(startof(v)+sizeof(ubyte)*5);
+    local ubyte b = ReadUByte(startof(v)+sizeof(ubyte)*6);
+    SPrintf(s, "RGBA: #%02x%02x%02x%02x", (r + ra) * a, (g + ga) * a, (b + ba) * a, a);
+    return s;
+};
+
+typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+    StructBase base(rootTablePosition, vtable, fieldIndex);
+    
+    uint32 count;
+    ColorTransform array[count];
+    FSeek(base.nextPosition);
+} ColorTransformVector;
+
+typedef struct {
+    RootTable rootTable;
+    
+    Matrix2x3Vector matrices(rootTable.descriptor.position, rootTable.vtable, 0);
+    ColorTransformVector colorTransforms(rootTable.descriptor.position, rootTable.vtable, 1);
+} MatrixBank<read=MatrixBankRead>;
+
+string MatrixBankRead(MatrixBank& v) {
+    local string s;
+    SPrintf(s, "Matrix bank (M: %d, C: %d)", v.matrices.count, v.colorTransforms.count);
+    return s;
+};
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    
+    uint32 count;
+    MatrixBank array[count];
+    FSeek(base.nextPosition);
+} MatrixBankVector;
+
 typedef struct {
     RootTable rootTable;
     
@@ -337,7 +400,7 @@ typedef struct {
     RectVector scalingGrids(rootTable, 3);  // 16 bytes align (stride). Perhaps, used as scalingGrids
     MovieClipFrameElementVector movieClipFrameElements(rootTable, 4);
     Vector unk6(rootTable, 5);
-    Vector unk7(rootTable, 6);
+    MatrixBankVector matrixBanks(rootTable, 6);
 } HeaderRoot;
 
 typedef struct {
@@ -353,7 +416,6 @@ typedef struct {
 
 typedef struct {
     uint unk1; // always 0
-    if (unk1 != 0) return;
     uint textureIndex;
     uint pointCount;
     uint startingPointIndex;
@@ -560,13 +622,13 @@ struct DataChunk (uint i) {
             ExportNamesRoot exports;
             break;
         case 2:
-            TextFieldsRoot textfields;
+            TextFieldsRoot textFields;
             break;
         case 3:
             ShapesRoot shapes;
             break;
         case 4:
-            MovieClipsRoot movieclips;
+            MovieClipsRoot movieClips;
             break;
         case 5:
             MovieClipModifiersRoot modifiers;
