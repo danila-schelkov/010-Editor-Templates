@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 0.9
+//   Version: 1.0
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   1.0   2024-11-03 Vorono4ka: Text field parsing implemented, not presented texture parsing fixed
 //   0.9   2024-11-02 Vorono4ka: Matrix banks parsing fixed (seeking next pointer after parsing element)
 //   0.8   2024-11-02 Vorono4ka: Parsing shape points as a structure
 //   0.7   2024-11-02 Vorono4ka: Parsing matrix banks
@@ -434,9 +435,45 @@ typedef struct {
     Int32Vector exportNameIds(rootTable.descriptor.position, rootTable.vtable, 1);
 } ExportNamesRoot <bgcolor=0xFF0000>;
 
+// Text Fields
+
+typedef struct {
+    uint16 id;
+    uint16 unused;  // there is no pointers to this value in lib
+    uint32 fontNameReferenceId;
+    // why not use a reference to the rect table?
+    int16 left, top, right, bottom;
+    uint32 color, outlineColor;
+    uint32 textReferenceId, anotherTextReferenceId;
+    if (anotherTextReferenceId != 0) Printf("WOW! %d", id);
+    ubyte styles;  // aka flags
+    ubyte align;
+    ubyte fontSize;
+    ubyte unused;  // there is no pointers to this value in lib, empty like in default structure
+    uint32 unk;  // should be short, so why it int?...
+} TextField<read=TextFieldRead>;
+
+string TextFieldRead(TextField& v) {
+    string s;
+    SPrintf(s, "TextField #%d", v.id);
+    return s;
+}
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    
+    uint32 count;
+    TextField array[count];
+    FSeek(base.nextPosition);
+} TextFieldVector;
+
 typedef struct {
     RootTable rootTable;
+    
+    TextFieldVector textFields(rootTable, 0);
 } TextFieldsRoot <bgcolor=0x0000FF>;
+
+// Shapes
 
 typedef struct {
     uint unk1; // always 0
@@ -585,6 +622,7 @@ typedef struct {
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {    
     StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    if (!base.isPresent) return;
     
     VTable vtable;
     
