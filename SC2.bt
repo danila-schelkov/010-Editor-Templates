@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 0.8
+//   Version: 0.9
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   0.9   2024-11-02 Vorono4ka: Matrix banks parsing fixed (seeking next pointer after parsing element)
 //   0.8   2024-11-02 Vorono4ka: Parsing shape points as a structure
 //   0.7   2024-11-02 Vorono4ka: Parsing matrix banks
 //   0.6   2024-11-02 Vorono4ka: Parsing movie clips
@@ -276,7 +277,7 @@ typedef struct {
     char text[length];
     
     FSeek(descriptor.nextPosition);
-} String<read=StringRead, size=4>;
+} String<read=StringRead, size=(sizeof(uint32))>;  // only size of descriptor offset
 
 string StringRead(String& v) {
     if (v.length == 0) {
@@ -302,7 +303,7 @@ string StringVectorRead(StringVector& v) {
 
 typedef struct {
     float left, top, right, bottom;
-} Rect<read=RectRead>;
+} Rect<read=RectRead, size=(sizeof(float)*4)>;
 
 string RectRead(Rect& v) {
     local string s;
@@ -376,6 +377,7 @@ typedef struct {
     
     Matrix2x3Vector matrices(rootTable.descriptor.position, rootTable.vtable, 0);
     ColorTransformVector colorTransforms(rootTable.descriptor.position, rootTable.vtable, 1);
+    FSeek(rootTable.descriptor.nextPosition + 4);
 } MatrixBank<read=MatrixBankRead>;
 
 string MatrixBankRead(MatrixBank& v) {
@@ -422,9 +424,7 @@ typedef struct {
     RectVector scalingGrids(rootTable, 3);
     MovieClipFrameElementVector movieClipFrameElements(rootTable, 4);
     ShapePointVector shapePoints(rootTable.descriptor.position, rootTable.vtable, 5);
-    // TODO: fix, something wrong with it when more than 1 matrix bank
-    // MatrixBankVector matrixBanks(rootTable, 6);
-    Vector matrixBanks(rootTable, 6);
+    MatrixBankVector matrixBanks(rootTable, 6);
 } HeaderRoot;
 
 typedef struct {
@@ -608,13 +608,11 @@ string TextureRead(Texture& v) {
 }
 
 typedef struct {
-    local uint position = FTell();
-    
     RootTable table;
     
     Texture lowresTexture(table, 0);
     Texture highresTexture(table, 1);
-    FSeek(position + 4);
+    FSeek(table.descriptor.nextPosition);
 } TextureSet;
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
