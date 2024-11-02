@@ -66,7 +66,7 @@ int GoToField(uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
     
     local int16 fieldOffset = vtable.fieldOffsets[fieldIndex];
-    Printf("fieldIndex: %d, fieldOffset: %d\n", fieldIndex, fieldOffset);
+    // Printf("fieldIndex: %d, fieldOffset: %d\n", fieldIndex, fieldOffset);
     if (fieldOffset == 0) {
         return false;
     }
@@ -445,7 +445,6 @@ typedef struct {
     int16 left, top, right, bottom;
     uint32 color, outlineColor;
     uint32 textReferenceId, anotherTextReferenceId;
-    if (anotherTextReferenceId != 0) Printf("WOW! %d", id);
     ubyte styles;  // aka flags
     ubyte align;
     ubyte fontSize;
