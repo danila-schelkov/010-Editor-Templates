@@ -611,6 +611,7 @@ typedef struct {
 
 string MovieClipRead(MovieClip& v) {
     string s;
+    // high load on cpu
     SPrintf(s, "MovieClip #%d", v.id.value);
     return s;
 }
@@ -633,7 +634,8 @@ typedef struct {
 // Textures
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    if (!GoToField(rootTable, fieldIndex)) return;
+    local int isPresent = GoToField(rootTable, fieldIndex);
+    if (!isPresent) return;
     
     RootTable table;
     
@@ -651,6 +653,10 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
 } Texture<read=TextureRead>;
 
 string TextureRead(Texture& v) {
+    if (!v.isPresent) {
+        return "Texture is not present";
+    }
+    
     string s;
     SPrintf(s, "Texture (%dx%d)", v.width.value, v.height.value);
     return s;
