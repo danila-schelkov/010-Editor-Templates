@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 1.0
+//   Version: 1.1
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   1.1   2024-11-03 Vorono4ka: Texture type field fixed, Indirect+VTable replaced with RootTable, Indirect fix
 //   1.0   2024-11-03 Vorono4ka: Text field parsing implemented, not presented texture parsing fixed
 //   0.9   2024-11-02 Vorono4ka: Matrix banks parsing fixed (seeking next pointer after parsing element)
 //   0.8   2024-11-02 Vorono4ka: Parsing shape points as a structure
@@ -25,7 +26,7 @@ typedef struct {
     local uint startPosition = FTell();
     
     local int32 offset = ReadInt(startPosition);
-    local uint nextPosition = FTell();
+    local uint nextPosition = FTell() + 4;
     local uint position = startPosition + offset;
 } Indirect<read=IndirectRead>;
 
@@ -54,29 +55,30 @@ string VTableValueRead(VTable &v) {
 
 typedef struct {
     Indirect descriptor;
+    if (descriptor.offset == 0) return;
     
     FSeek(descriptor.position);
     VTable vtable;
     FSeek(descriptor.position);
 } RootTable <bgcolor = 0xFFFF7F>;
 
-int GoToField(uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    if (fieldIndex < 0 || fieldIndex >= vtable.fieldCount) {
+int GoToField(RootTable& rootTable, uint fieldIndex) {
+    if (fieldIndex < 0 || fieldIndex >= rootTable.vtable.fieldCount) {
         return false;
     }
     
-    local int16 fieldOffset = vtable.fieldOffsets[fieldIndex];
+    local int16 fieldOffset = rootTable.vtable.fieldOffsets[fieldIndex];
     // Printf("fieldIndex: %d, fieldOffset: %d\n", fieldIndex, fieldOffset);
     if (fieldOffset == 0) {
         return false;
     }
     
-    FSeek(rootTablePosition + fieldOffset);
+    FSeek(rootTable.descriptor.position + fieldOffset);
     return true;
 };
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    local int isPresent = GoToField(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local int isPresent = GoToField(rootTable, fieldIndex);
     if (!isPresent) {
         local uint nextPosition = FTell();
         local uint structOffset = 0;
@@ -101,7 +103,8 @@ string StructBaseRead(StructBase &v) {
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     // strT array[count];
@@ -120,8 +123,8 @@ string VectorRead(Vector &v) {
 
 // Built-in types
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
     if (!base.isPresent) return;
     
     uint32 count;
@@ -129,8 +132,8 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     FSeek(base.nextPosition);
 } Int8Vector;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
     if (!base.isPresent) return;
     
     uint32 count;
@@ -138,8 +141,8 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     FSeek(base.nextPosition);
 } Int16Vector;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
     if (!base.isPresent) return;
     
     uint32 count;
@@ -147,8 +150,8 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     FSeek(base.nextPosition);
 } Int32Vector;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
     if (!base.isPresent) return;
     
     uint32 count;
@@ -156,9 +159,9 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     FSeek(base.nextPosition);
 } FloatVector;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+typedef struct (RootTable& rootTable, uint fieldIndex) {
     local uint position = FTell();
-    local byte isPresent = GoToField(rootTablePosition, vtable, fieldIndex);
+    local byte isPresent = GoToField(rootTable, fieldIndex);
     if (isPresent) {
         byte value;
         FSeek(position);
@@ -167,9 +170,9 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
 } Int8 <read=value>;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+typedef struct (RootTable& rootTable, uint fieldIndex) {
     local uint position = FTell();
-    local byte isPresent = GoToField(rootTablePosition, vtable, fieldIndex);
+    local byte isPresent = GoToField(rootTable, fieldIndex);
     if (isPresent) {
         ubyte value;
         FSeek(position);
@@ -178,9 +181,9 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
 } UInt8 <read=value>;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+typedef struct (RootTable& rootTable, uint fieldIndex) {
     local uint position = FTell();
-    local byte isPresent = GoToField(rootTablePosition, vtable, fieldIndex);
+    local byte isPresent = GoToField(rootTable, fieldIndex);
     if (isPresent) {
         int16 value;
         FSeek(position);
@@ -189,9 +192,9 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
 } Int16 <read=value>;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+typedef struct (RootTable& rootTable, uint fieldIndex) {
     local uint position = FTell();
-    local byte isPresent = GoToField(rootTablePosition, vtable, fieldIndex);
+    local byte isPresent = GoToField(rootTable, fieldIndex);
     if (isPresent) {
         uint16 value;
         FSeek(position);
@@ -200,9 +203,9 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
 } UInt16 <read=value>;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+typedef struct (RootTable& rootTable, uint fieldIndex) {
     local uint position = FTell();
-    local byte isPresent = GoToField(rootTablePosition, vtable, fieldIndex);
+    local byte isPresent = GoToField(rootTable, fieldIndex);
     if (isPresent) {
         int32 value;
         FSeek(position);
@@ -211,9 +214,9 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
 } Int32 <read=value>;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+typedef struct (RootTable& rootTable, uint fieldIndex) {
     local uint position = FTell();
-    local byte isPresent = GoToField(rootTablePosition, vtable, fieldIndex);
+    local byte isPresent = GoToField(rootTable, fieldIndex);
     if (isPresent) {
         uint32 value;
         FSeek(position);
@@ -222,9 +225,9 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
 } UInt32 <read=value>;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
+typedef struct (RootTable& rootTable, uint fieldIndex) {
     local uint position = FTell();
-    local byte isPresent = GoToField(rootTablePosition, vtable, fieldIndex);
+    local byte isPresent = GoToField(rootTable, fieldIndex);
     if (isPresent) {
         float value;
         FSeek(position);
@@ -233,8 +236,9 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
     }
 } Float <read=value>;
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 length;
     char array[length];
@@ -247,7 +251,7 @@ string ByteArrayRead(ByteArray& v) {
     return s;
 }
 
-// 
+// Frame Elements
 
 typedef struct {
     ushort childIndex;
@@ -262,12 +266,15 @@ string frameElementRead(MovieClipFrameElement &v) {
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     MovieClipFrameElement array[count / 3];
     FSeek(base.nextPosition);
 } MovieClipFrameElementVector;
+
+// Strings
 
 typedef struct {
     Indirect descriptor;
@@ -289,7 +296,8 @@ string StringRead(String& v) {
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     String array[count] <optimize=false>;
@@ -302,6 +310,8 @@ string StringVectorRead(StringVector& v) {
     return s;
 }
 
+// Scaling Grids
+
 typedef struct {
     float left, top, right, bottom;
 } Rect<read=RectRead, size=(sizeof(float)*4)>;
@@ -313,7 +323,8 @@ string RectRead(Rect& v) {
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     Rect array[count];
@@ -332,8 +343,8 @@ string Matrix2x3Read(Matrix2x3& v) {
     return s;
 };
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
     
     uint32 count;
     Matrix2x3 array[count];
@@ -365,8 +376,9 @@ string ColorTransformRead(ColorTransform& v) {
     return s;
 };
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     ColorTransform array[count];
@@ -376,8 +388,8 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
 typedef struct {
     RootTable rootTable;
     
-    Matrix2x3Vector matrices(rootTable.descriptor.position, rootTable.vtable, 0);
-    ColorTransformVector colorTransforms(rootTable.descriptor.position, rootTable.vtable, 1);
+    Matrix2x3Vector matrices(rootTable, 0);
+    ColorTransformVector colorTransforms(rootTable, 1);
     FSeek(rootTable.descriptor.nextPosition + 4);
 } MatrixBank<read=MatrixBankRead>;
 
@@ -388,14 +400,15 @@ string MatrixBankRead(MatrixBank& v) {
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     MatrixBank array[count] <optimize=false>;
     FSeek(base.nextPosition);
 } MatrixBankVector;
 
-// Movie Clips
+// Shape Points
 
 typedef struct {
     float x, y;
@@ -408,8 +421,8 @@ string ShapePointRead(ShapePoint& v) {
     return s;
 }
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
     
     uint32 count;
     ShapePoint array[count / sizeof(ShapePoint)];
@@ -424,15 +437,15 @@ typedef struct {
     Vector unk3(rootTable, 2);
     RectVector scalingGrids(rootTable, 3);
     MovieClipFrameElementVector movieClipFrameElements(rootTable, 4);
-    ShapePointVector shapePoints(rootTable.descriptor.position, rootTable.vtable, 5);
+    ShapePointVector shapePoints(rootTable, 5);
     MatrixBankVector matrixBanks(rootTable, 6);
 } HeaderRoot;
 
 typedef struct {
     RootTable rootTable;
     
-    Int16Vector exportIds(rootTable.descriptor.position, rootTable.vtable, 0);
-    Int32Vector exportNameIds(rootTable.descriptor.position, rootTable.vtable, 1);
+    Int16Vector exportIds(rootTable, 0);
+    Int32Vector exportNameIds(rootTable, 1);
 } ExportNamesRoot <bgcolor=0xFF0000>;
 
 // Text Fields
@@ -459,7 +472,8 @@ string TextFieldRead(TextField& v) {
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     TextField array[count];
@@ -479,7 +493,7 @@ typedef struct {
     uint textureIndex;
     uint pointCount;
     uint startingPointIndex;
-} ShapeDrawBitmapCommand<read=ShapeDrawBitmapCommandRead>;
+} ShapeDrawBitmapCommand<read=ShapeDrawBitmapCommandRead, size=(4*sizeof(uint))>;
 
 string ShapeDrawBitmapCommandRead(ShapeDrawBitmapCommand& v) {
     local string s;
@@ -487,8 +501,9 @@ string ShapeDrawBitmapCommandRead(ShapeDrawBitmapCommand& v) {
     return s;
 }
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     int32 count;
     ShapeDrawBitmapCommand array[count];
@@ -496,15 +511,12 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
 } ShapeDrawBitmapCommandVector;
 
 typedef struct {
-    Indirect descriptor;
+    RootTable table;
     
-    FSeek(descriptor.position);
-    VTable vtable;
+    UInt16 id(table, 0);
+    ShapeDrawBitmapCommandVector commands(table, 1);
     
-    UInt16 id(descriptor.position, vtable, 0);
-    ShapeDrawBitmapCommandVector commands(descriptor.position, vtable, 1);
-    
-    FSeek(descriptor.nextPosition);
+    FSeek(table.descriptor.nextPosition);
 } Shape<read=ShapeRead, size=4>;
 
 string ShapeRead(Shape& v) {
@@ -514,7 +526,8 @@ string ShapeRead(Shape& v) {
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     Shape array[count] <optimize=false>;
@@ -541,7 +554,8 @@ string MovieClipModifierRead(MovieClipModifier& v) {
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     MovieClipModifier array[count];
@@ -559,7 +573,7 @@ typedef struct {
 typedef struct {
     uint32 usedTransformsCount;
     uint32 labelStringIndex;
-} MovieClipFrame<read=MovieClipFrameRead>;
+} MovieClipFrame<read=MovieClipFrameRead, size=(2*sizeof(uint32))>;
 
 string MovieClipFrameRead(MovieClipFrame& v) {
     string s;
@@ -567,8 +581,9 @@ string MovieClipFrameRead(MovieClipFrame& v) {
     return s;
 }
 
-typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
-    StructBase base(rootTablePosition, vtable, fieldIndex);
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     MovieClipFrame array[count];
@@ -576,25 +591,22 @@ typedef struct (uint rootTablePosition, VTable& vtable, uint fieldIndex) {
 } MovieClipFrameVector;
 
 typedef struct {
-    Indirect descriptor;
+    RootTable table;
     
-    FSeek(descriptor.position);
-    VTable vtable;
+    UInt16 id(table, 0);
+    UInt32 exportName(table, 1);  // export name, string reference index
+    UInt8 fps(table, 2);  // second byte of fps short. this.fps = this.fps & 0xFF80 | u2 & 0x7F
+    UInt16 frameCount(table, 3);
+    UInt8 u4(table, 4);  // 7th bit of fps short - some boolean. this.fps = (u4 << 7) | this.fps & 0xFF7F;
+    Int16Vector childIds(table, 5);
+    Int8Vector childBlends(table, 6);
+    Int16Vector childNames(table, 7);  // refers to the strings from header
+    MovieClipFrameVector frames(table, 8);
+    UInt32 frameElementOffset(table, 9);  // or start frame element index, TODO: determine whether it bytes or not
+    UInt16 matrixBankIndex(table, 10);  // first byte of fps short. this.fps = ((u10 & 0x7F) << 8) | this.fps & 0x80FF
+    UInt32 scalingGridIndex(table, 11);
     
-    UInt16 id(descriptor.position, vtable, 0);
-    UInt32 exportName(descriptor.position, vtable, 1);  // export name, string reference index
-    UInt8 fps(descriptor.position, vtable, 2);  // second byte of fps short. this.fps = this.fps & 0xFF80 | u2 & 0x7F
-    UInt16 frameCount(descriptor.position, vtable, 3);
-    UInt8 u4(descriptor.position, vtable, 4);  // 7th bit of fps short - some boolean. this.fps = (u4 << 7) | this.fps & 0xFF7F;
-    Int16Vector childIds(descriptor.position, vtable, 5);
-    Int8Vector childBlends(descriptor.position, vtable, 6);
-    Int16Vector childNames(descriptor.position, vtable, 7);  // refers to the strings from header
-    MovieClipFrameVector frames(descriptor.position, vtable, 8);
-    UInt32 frameElementOffset(descriptor.position, vtable, 9);  // or start frame element index, TODO: determine whether it bytes or not
-    UInt16 matrixBankIndex(descriptor.position, vtable, 10);  // first byte of fps short. this.fps = ((u10 & 0x7F) << 8) | this.fps & 0x80FF
-    UInt32 scalingGridIndex(descriptor.position, vtable, 11);
-    
-    FSeek(descriptor.nextPosition);
+    FSeek(table.descriptor.nextPosition);
 } MovieClip<read=MovieClipRead, size=4>;
 
 string MovieClipRead(MovieClip& v) {
@@ -604,7 +616,8 @@ string MovieClipRead(MovieClip& v) {
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     MovieClip array[count] <optimize=false>;
@@ -619,23 +632,22 @@ typedef struct {
 
 // Textures
 
-typedef struct (RootTable& rootTable, uint fieldIndex) {    
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
-    if (!base.isPresent) return;
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    if (!GoToField(rootTable, fieldIndex)) return;
     
-    VTable vtable;
+    RootTable table;
     
-    Int32 flags(base.structPosition, vtable, 0);
+    Int32 flags(table, 0);
     // Type converts to strange metrics: If in bounds, then [42, 43, 40, 70, 265, 70, 70, 42, 264](v - 2), otherwise 70.
-    Int16 type(base.structPosition, vtable, 1);
-    Int16 width(base.structPosition, vtable, 2);
-    Int16 height(base.structPosition, vtable, 3);
-    ByteArray textureData(base.structPosition, vtable, 4);
+    Int8 type(table, 1);
+    Int16 width(table, 2);
+    Int16 height(table, 3);
+    ByteArray textureData(table, 4);
     if (textureData.base.isPresent) {
-        Int32 textureFilename(base.structPosition, vtable, 5);  // offset to null-terminated string or string reference
+        Int32 textureFilename(table, 5);  // offset to null-terminated string or string reference
     }
     
-    FSeek(base.nextPosition);
+    FSeek(table.descriptor.nextPosition);
 } Texture<read=TextureRead>;
 
 string TextureRead(Texture& v) {
@@ -653,7 +665,8 @@ typedef struct {
 } TextureSet;
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
-    StructBase base(rootTable.descriptor.position, rootTable.vtable, fieldIndex);
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     TextureSet array[count] <optimize=false>;
@@ -672,8 +685,7 @@ struct DataChunk (uint i) {
     int length;
     local uint position = FTell();
 
-    switch (i)
-    {
+    switch (i) {
         case 0:
             HeaderRoot header;
             break;
