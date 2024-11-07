@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 1.1
+//   Version: 1.2
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   1.2   2024-11-07 Vorono4ka: MatrixBanks and Movie Clip structure are fixed
 //   1.1   2024-11-03 Vorono4ka: Texture type field fixed, Indirect+VTable replaced with RootTable, Indirect fix
 //   1.0   2024-11-03 Vorono4ka: Text field parsing implemented, not presented texture parsing fixed
 //   0.9   2024-11-02 Vorono4ka: Matrix banks parsing fixed (seeking next pointer after parsing element)
@@ -21,6 +22,8 @@
 //   0.2   2024-11-01 Vorono4ka: Reading movie clip modifiers
 //   0.1   2024-11-01 Vorono4ka: Work on SC2 started... Reading textures section
 //------------------------------------------------
+
+LittleEndian();
 
 typedef struct {
     local uint startPosition = FTell();
@@ -390,7 +393,7 @@ typedef struct {
     
     Matrix2x3Vector matrices(rootTable, 0);
     ColorTransformVector colorTransforms(rootTable, 1);
-    FSeek(rootTable.descriptor.nextPosition + 4);
+    FSeek(rootTable.descriptor.nextPosition);
 } MatrixBank<read=MatrixBankRead>;
 
 string MatrixBankRead(MatrixBank& v) {
@@ -462,7 +465,7 @@ typedef struct {
     ubyte align;
     ubyte fontSize;
     ubyte unused;  // there is no pointers to this value in lib, empty like in default structure
-    uint32 unk;  // should be short, so why it int?...
+    uint32 unk;  // should be short, so why it int?... Maybe combination of unk short and bend short
 } TextField<read=TextFieldRead>;
 
 string TextFieldRead(TextField& v) {
@@ -599,8 +602,8 @@ typedef struct {
     UInt16 frameCount(table, 3);
     UInt8 u4(table, 4);  // 7th bit of fps short - some boolean. this.fps = (u4 << 7) | this.fps & 0xFF7F;
     Int16Vector childIds(table, 5);
-    Int8Vector childBlends(table, 6);
-    Int16Vector childNames(table, 7);  // refers to the strings from header
+    Int32Vector childNameRefIds(table, 6);
+    Int8Vector childBlends(table, 7);
     MovieClipFrameVector frames(table, 8);
     UInt32 frameElementOffset(table, 9);  // or start frame element index, TODO: determine whether it bytes or not
     UInt16 matrixBankIndex(table, 10);  // first byte of fps short. this.fps = ((u10 & 0x7F) << 8) | this.fps & 0x80FF
@@ -645,9 +648,7 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
     Int16 width(table, 2);
     Int16 height(table, 3);
     ByteArray textureData(table, 4);
-    if (textureData.base.isPresent) {
-        Int32 textureFilename(table, 5);  // offset to null-terminated string or string reference
-    }
+    Int32 textureFilename(table, 5);  // offset to null-terminated string or string reference
     
     FSeek(table.descriptor.nextPosition);
 } Texture<read=TextureRead>;
