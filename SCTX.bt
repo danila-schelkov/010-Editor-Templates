@@ -1,0 +1,363 @@
+//------------------------------------------------
+//--- 010 Editor v15.0 Binary Template
+//
+//      File: SCTX.bt
+//   Authors: Vorono4ka
+//   Version: 1.0
+//   Purpose: SCTX (Supercell Texture) file format template
+//  Category: Game
+// File Mask: *.sctx
+//  ID Bytes: 
+//   History: 
+//   1.0   2024-12-13 Vorono4ka: Basic structure and variables added: texture data and mip map data
+//------------------------------------------------
+
+LittleEndian();
+
+typedef struct {
+    local uint startPosition = FTell();
+    
+    local int32 offset = ReadInt(startPosition);
+    local uint nextPosition = FTell() + 4;
+    local uint position = startPosition + offset;
+} Indirect<read=IndirectRead>;
+
+string IndirectRead(Indirect &v) {
+    local string s;
+    SPrintf(s, "Position: %d", v.position);
+    return s;
+};
+
+typedef struct {
+    local uint position = FTell();
+    int vtableOffset;
+    local uint vtable = position - vtableOffset;
+    FSeek(vtable);
+    uint16 vtableSize;  // starting from here
+    uint16 tableDataSize;
+    local uint16 fieldCount = (vtableSize - 4) / 2;
+    uint16 fieldOffsets[fieldCount];
+} VTable <read=VTableValueRead, bgcolor = 0xFFFFFF, size=4>;
+
+string VTableValueRead(VTable &v) {
+    local string s;
+    SPrintf(s, "Field offset count: %d", v.fieldCount);
+    return s;
+};
+
+typedef struct {
+    Indirect descriptor;
+    if (descriptor.offset == 0) return;
+    
+    FSeek(descriptor.position);
+    VTable vtable;
+    FSeek(descriptor.position);
+} RootTable <bgcolor = 0xFFFF7F>;
+
+int GoToField(RootTable& rootTable, uint fieldIndex) {
+    if (fieldIndex < 0 || fieldIndex >= rootTable.vtable.fieldCount) {
+        return false;
+    }
+    
+    local int16 fieldOffset = rootTable.vtable.fieldOffsets[fieldIndex];
+    // Printf("fieldIndex: %d, fieldOffset: %d\n", fieldIndex, fieldOffset);
+    if (fieldOffset == 0) {
+        return false;
+    }
+    
+    FSeek(rootTable.descriptor.position + fieldOffset);
+    return true;
+};
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local int isPresent = GoToField(rootTable, fieldIndex);
+    if (!isPresent) {
+        local uint nextPosition = FTell();
+        local uint structOffset = 0;
+        return;
+    }
+    
+    local uint position = FTell();
+    uint structOffset;
+    local uint nextPosition = FTell();
+    local uint structPosition = position + structOffset;
+    FSeek(structPosition);
+} StructBase <read=StructBaseRead>;
+
+string StructBaseRead(StructBase &v) {
+    if (!v.isPresent) {
+        return "Value is not present";
+    }
+    
+    local string s = "";
+    SPrintf(s, "Position: %d", v.structPosition);
+    return s;
+};
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    // strT array[count];
+    FSeek(base.nextPosition);
+} Vector <read=VectorRead, bgcolor = 0xFFFFFF>;
+
+string VectorRead(Vector &v) {
+    if (!v.base.isPresent) {
+        return StructBaseRead(v.base);
+    }
+    
+    local string s = "";
+    SPrintf(s, "Element count: %d", v.count);
+    return s;
+};
+
+// Built-in types
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    byte array[count];
+    FSeek(base.nextPosition);
+} Int8Vector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    int16 array[count];
+    FSeek(base.nextPosition);
+} Int16Vector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    int32 array[count];
+    FSeek(base.nextPosition);
+} Int32Vector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    uint32 array[count];
+    FSeek(base.nextPosition);
+} UInt32Vector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    float array[count];
+    FSeek(base.nextPosition);
+} FloatVector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex, byte defaultValue) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        byte value;
+        FSeek(position);
+    } else {
+        local byte value = defaultValue;
+    }
+} Int8 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex, ubyte defaultValue) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        ubyte value;
+        FSeek(position);
+    } else {
+        local ubyte value = defaultValue;
+    }
+} UInt8 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        int16 value;
+        FSeek(position);
+    } else {
+        local int16 value = 0; // "Value is not present";
+    }
+} Int16 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        uint16 value;
+        FSeek(position);
+    } else {
+        local uint16 value = 0; // "Value is not present";
+    }
+} UInt16 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        int32 value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} Int32 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        uint32 value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} UInt32 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        float value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} Float <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 length;
+    char array[length];
+    FSeek(base.nextPosition);
+} ByteArray<read=ByteArrayRead>;
+
+string ByteArrayRead(ByteArray& v) {
+    string s;
+    SPrintf(s, "Byte Array [%d]", v.length);
+    return s;
+}
+
+// Strings
+
+typedef struct {
+    Indirect descriptor;
+    
+    FSeek(descriptor.position);
+    
+    uint32 length;
+    char text[length];
+    
+    FSeek(descriptor.nextPosition);
+} String<read=StringRead, size=(sizeof(uint32))>;  // only size of descriptor offset
+
+string StringRead(String& v) {
+    if (v.length == 0) {
+        return "";
+    }
+    
+    return v.text;
+}
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    String array[count] <optimize=false>;
+    FSeek(base.nextPosition);
+} StringVector <read=StringVectorRead>;
+
+string StringVectorRead(StringVector& v) {
+    local string s; 
+    SPrintf(s, "Count: %d", v.count); 
+    return s;
+}
+
+typedef struct {
+    RootTable table;
+    UInt32 pixelType(table, 0);
+    UInt16 width(table, 1);
+    UInt16 height(table, 2);
+    ByteArray data(table, 3);
+    
+    FSeek(table.descriptor.nextPosition);
+} StreamingTexture;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    StreamingTexture array[count] <optimize=false>;
+    FSeek(base.nextPosition);
+} StreamingTextureVector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (!isPresent) return;
+    
+    RootTable table;
+    UInt32Vector streamingIds(table, 0);
+    StreamingTextureVector textureStreamingProxy(table, 1);
+    FSeek(table.descriptor.nextPosition);
+} TextureVariants;
+
+typedef struct {
+    RootTable rootTable;
+    
+    Int32 unk1(rootTable, 0);
+    UInt32 pixelType(rootTable, 1);
+    UInt16 width(rootTable, 2);
+    UInt16 height(rootTable, 3);
+    UInt8 mipMapLevelCount(rootTable, 4, 1);
+    Int32 unk6(rootTable, 5);
+    UInt32 flags(rootTable, 6);
+    UInt32 dataLength(rootTable, 7);
+    Int32 unk9(rootTable, 8);
+    Int32 unk10(rootTable, 9);
+    TextureVariants variants(rootTable, 10);
+} TextureData;
+
+typedef struct {
+    RootTable rootTable;
+    
+    UInt16 width(rootTable, 0);
+    UInt16 height(rootTable, 1);
+    Int32 offset(rootTable, 2);
+    ByteArray hash(rootTable, 3);
+} MipMapData <bgcolor=0x00FF00>;
+
+struct FILE {
+    int textureDataLength <hidden=true>;
+    local uint position;
+    
+    position = FTell();
+    TextureData textureData <size=textureDataLength>;
+    FSeek(position + textureDataLength);
+    
+    int mipMapDataLength <hidden=true>;
+    position = FTell();
+    struct {
+        local int i = 0;
+        for (i = 0; i < textureData.mipMapLevelCount.value; i++) {
+            int mipMapDataLength <hidden=true>;
+            MipMapData mipmapData <size=mipMapDataLength>;
+        }
+    } mipMaps <size=mipMapDataLength>;
+    FSeek(position + mipMapDataLength);
+} file;
