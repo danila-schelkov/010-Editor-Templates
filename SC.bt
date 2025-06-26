@@ -38,11 +38,15 @@ typedef struct {
 } String <read=stringRead, write=stringWrite, size=stringSize>;
 
 string stringRead(String &v) {
-    if (v.length > 0 && v.length != 255) {
-        return v.value;
-    } else {
+    if (v.length == 255) {
+        return "null";
+    }
+    
+    if (v.length == 0) {
         return "";
     }
+    
+    return v.value;
 };
 
 void stringWrite(String &v, string value) {
@@ -160,6 +164,13 @@ typedef struct {
     ushort height;
     
     if (hasTexture) {
+        if (tag == 45) {
+            byte ktxData[ktxSize];
+            return;
+        } else if (tag == 47) {
+            return;
+        }
+        
         local int pixelBytes;
         
         switch (pixelType) 
@@ -177,13 +188,6 @@ typedef struct {
             default:
                 pixelBytes = 4;
                 break;
-        }
-
-        if (tag == 45) {
-            byte pixels[ktxSize];
-            return;
-        } else if (tag == 47) {
-            return;
         }
 
         byte pixels[(int) width * height * pixelBytes];
@@ -267,6 +271,14 @@ typedef struct {
     if (tag == 49)
     {
         ubyte customPropertyCount;
+        for (i = 0; i < customPropertyCount; i++) {
+            ubyte propertyType;
+            if (propertyType == 0) {
+                byte customPropertyBoolean;  // bool
+            } else {
+                Printf("Unsupported custom property type: %d", propertyType);
+            }
+        }
     }
 
     switch (tag)
@@ -311,16 +323,26 @@ typedef struct {
     ushort id;
 } MovieClipModifier <size=(sizeof(ushort))>;
 
+string ColorRead(uint32 color) {
+    ubyte r = color >> 24;
+    ubyte g = (color >> 16) & 0xFF;
+    ubyte b = (color >> 8) & 0xFF;
+    ubyte a = color & 0xFF;
+    
+    string s;
+    SPrintf(s, "#%02x%02x%02x %d", r, g, b, a);
+    return s;
+}
 
 // TextFields
 typedef struct {
     short id;
     String fontName;
-    int32 fontColor;
+    uint32 fontColor <read=ColorRead>;
     
-    byte bold;  // bool
-    byte italic;  // bool
-    byte multiline;  // bool
+    byte isBold;  // bool
+    byte isItalic;  // bool
+    byte isMultiline;  // bool
     byte unused;  // bool
 
     byte align;
@@ -330,44 +352,48 @@ typedef struct {
     short right;
     short bottom;
     
-    byte unk;  // bool
+    byte isOutlineEnabled;  // bool
     
     String defaultText;
 
     if (tag == 7) return;
     
-    byte unk;  // bool
+    byte useDeviceFont;  // bool
+    
     switch (tag)
     {
         case 25:
-            int32 outlineColor;
+            int32 outlineColor <read=ColorRead>;
             return;
         case 21:
-            int32 outlineColor;
+            int32 outlineColor <read=ColorRead>;
             return;
         case 20:
             return;
     }
     if (tag >= 33)
     {
-        int32 outlineColor;
+        uint32 outlineColor <read=ColorRead>;
         short unk;
-        short unk;
+        short unused;
 
-        if ((uint) (tag - 43) <= 1)
-        {
-            short unk;
+        if (tag == 33) {
+            return;
         }
+        
+        short bendAngle <read=(0x7FFF * value / 360)>;
 
-        if (tag >= 44)
-        {
-            byte unk;  // bool
-
-            if (tag >= 46)
-            {
-                byte unk;  // bool
-            }
+        if (tag == 43) {
+            return;
         }
+    
+        byte autoAdjustFontSize;  // bool
+
+        if (tag == 44) {
+            return;
+        }
+        
+        byte unk;  // bool
     }
 } TextField;
 
@@ -438,6 +464,7 @@ typedef struct {
         case 10:
         case 12:
         case 14:
+        case 35:
         case 49:
             MovieClip movieClip;
             break;
@@ -454,6 +481,7 @@ typedef struct {
             Printf("SupercellSWF::TAG_SHAPE_DRAW_COLOR_FILL_COMMAND not supported");
             break;
         case 7:
+        case 15:
         case 25:
         case 33:
         case 44:
@@ -481,6 +509,7 @@ typedef struct {
             hasTexture = 0;
             break;
         case 31:
+            Printf("Scaling grid %x\n", FTell());
             TwipRect scalingGrid;
             break;
         case 32:
@@ -554,6 +583,7 @@ string tagComment(Tag &v) {
         case 10:
         case 12:
         case 14:
+        case 35:
         case 49:
             type = "MovieClip";
             break;
@@ -565,6 +595,7 @@ string tagComment(Tag &v) {
             type = "ShapeDrawBitmapCommand";
             break;
         case 7:
+        case 15:
         case 25:
         case 33:
         case 44:
@@ -610,8 +641,7 @@ string tagComment(Tag &v) {
     return s;
 };
 
-int tagSize(Tag &v)
-{
+int tagSize(Tag &v) {
     return sizeof(ubyte) + sizeof(uint) + ReadUInt(startof(v)+1);
 };
 
