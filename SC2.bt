@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 1.3
+//   Version: 1.4
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   1.4   2025-06-26 Vorono4ka: texture filename as a string, SPrintf replaced with Str
 //   1.3   2025-03-11 Vorono4ka: Short Matrix2x3 and short MovieClipFrame added
 //   1.2   2024-11-07 Vorono4ka: MatrixBanks and Movie Clip structure are fixed
 //   1.1   2024-11-03 Vorono4ka: Texture type field fixed, Indirect+VTable replaced with RootTable, Indirect fix
@@ -35,9 +36,7 @@ typedef struct {
 } Indirect<read=IndirectRead>;
 
 string IndirectRead(Indirect &v) {
-    local string s;
-    SPrintf(s, "Position: %d", v.position);
-    return s;
+    return Str("Position: %d", v.position);
 };
 
 typedef struct {
@@ -52,9 +51,7 @@ typedef struct {
 } VTable <read=VTableValueRead, bgcolor = 0xFFFFFF, size=4>;
 
 string VTableValueRead(VTable &v) {
-    local string s;
-    SPrintf(s, "Field offset count: %d", v.fieldCount);
-    return s;
+    return Str("Field offset count: %d", v.fieldCount);
 };
 
 typedef struct {
@@ -101,9 +98,7 @@ string StructBaseRead(StructBase &v) {
         return "Value is not present";
     }
     
-    local string s = "";
-    SPrintf(s, "Position: %d", v.structPosition);
-    return s;
+    return Str("Position: %d", v.structPosition);
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -111,7 +106,6 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
     if (!base.isPresent) return;
     
     uint32 count;
-    // strT array[count];
     FSeek(base.nextPosition);
 } Vector <read=VectorRead, bgcolor = 0xFFFFFF>;
 
@@ -120,9 +114,7 @@ string VectorRead(Vector &v) {
         return StructBaseRead(v.base);
     }
     
-    local string s = "";
-    SPrintf(s, "Element count: %d", v.count);
-    return s;
+    return Str("Element count: %d", v.count);
 };
 
 // Built-in types
@@ -250,9 +242,7 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
 } ByteArray<read=ByteArrayRead>;
 
 string ByteArrayRead(ByteArray& v) {
-    string s;
-    SPrintf(s, "Byte Array [%d]", v.length);
-    return s;
+    return Str("Byte Array [%d]", v.base.isPresent ? v.length : -1);
 }
 
 // Frame Elements
@@ -264,9 +254,7 @@ typedef struct {
 } MovieClipFrameElement <read=frameElementRead, size=(3*sizeof(ushort))>;
 
 string frameElementRead(MovieClipFrameElement &v) {
-    local string s;
-    SPrintf(s, "%d - %d, %d", v.childIndex, v.matrixIndex, v.colorTransformIndex);
-    return s;
+    return Str("%d - %d, %d", v.childIndex, v.matrixIndex, v.colorTransformIndex);
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -300,6 +288,16 @@ string StringRead(String& v) {
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local int isPresent = GoToField(rootTable, fieldIndex);
+    if (!isPresent) {
+        return;
+    }
+    
+    local uint position = FTell();
+    String value;
+} StringRef<read=StringRead(value)>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
     StructBase base(rootTable, fieldIndex);
     if (!base.isPresent) return;
     
@@ -309,9 +307,7 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
 } StringVector <read=StringVectorRead>;
 
 string StringVectorRead(StringVector& v) {
-    local string s; 
-    SPrintf(s, "Count: %d", v.count); 
-    return s;
+    return Str("Count: %d", v.count);
 }
 
 // Scaling Grids
@@ -321,9 +317,7 @@ typedef struct {
 } Rect<read=RectRead, size=(sizeof(float)*4)>;
 
 string RectRead(Rect& v) {
-    local string s;
-    SPrintf(s, "%.2f, %.2f, %.2f, %.2f", v.left, v.top, v.right, v.bottom);
-    return s;
+    return Str("%.2f, %.2f, %.2f, %.2f", v.left, v.top, v.right, v.bottom);
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -342,9 +336,7 @@ typedef struct {
 } Matrix2x3 <read=Matrix2x3Read, size=(6*sizeof(float))>;
 
 string Matrix2x3Read(Matrix2x3& v) {
-    local string s;
-    SPrintf(s, "%.2f %.2f %.2f %.2f %.2f %.2f", ReadFloat(startof(v)), ReadFloat(startof(v)+sizeof(float)), ReadFloat(startof(v)+sizeof(float)*2), ReadFloat(startof(v)+sizeof(float)*3), ReadFloat(startof(v)+sizeof(float)*4), ReadFloat(startof(v)+sizeof(float)*5));
-    return s;
+    return Str("%.2f %.2f %.2f %.2f %.2f %.2f", ReadFloat(startof(v)), ReadFloat(startof(v)+sizeof(float)), ReadFloat(startof(v)+sizeof(float)*2), ReadFloat(startof(v)+sizeof(float)*3), ReadFloat(startof(v)+sizeof(float)*4), ReadFloat(startof(v)+sizeof(float)*5));
 };
 
 typedef struct {
@@ -352,9 +344,7 @@ typedef struct {
 } ShortMatrix2x3 <read=ShortMatrix2x3Read, size=(6*sizeof(float))>;
 
 string ShortMatrix2x3Read(ShortMatrix2x3& v) {
-    local string s;
-    SPrintf(s, "%.2f %.2f %.2f %.2f %.2f %.2f", (float) ReadShort(startof(v)) / 1024, (float) ReadShort(startof(v)+sizeof(short)) / 1024, (float) ReadShort(startof(v)+sizeof(short)*2) / 1024, (float) ReadShort(startof(v)+sizeof(short)*3) / 1024, (float) ReadShort(startof(v)+sizeof(short)*4) / 20, (float) ReadShort(startof(v)+sizeof(short)*5) / 20);
-    return s;
+    return Str("%.2f %.2f %.2f %.2f %.2f %.2f", (float) ReadShort(startof(v)) / 1024, (float) ReadShort(startof(v)+sizeof(short)) / 1024, (float) ReadShort(startof(v)+sizeof(short)*2) / 1024, (float) ReadShort(startof(v)+sizeof(short)*3) / 1024, (float) ReadShort(startof(v)+sizeof(short)*4) / 20, (float) ReadShort(startof(v)+sizeof(short)*5) / 20);
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -388,16 +378,15 @@ typedef struct {
 } ColorTransform <read=ColorTransformRead, size=(7*sizeof(ubyte))>;
 
 string ColorTransformRead(ColorTransform& v) {
-    local string s;
-    local ubyte r = ReadUByte(startof(v)+sizeof(ubyte));
+    local ubyte r = ReadUByte(startof(v)+sizeof(ubyte)*0);
     local ubyte g = ReadUByte(startof(v)+sizeof(ubyte)*1);
     local ubyte b = ReadUByte(startof(v)+sizeof(ubyte)*2);
     local ubyte a = ReadUByte(startof(v)+sizeof(ubyte)*3);
     local ubyte ra = ReadUByte(startof(v)+sizeof(ubyte)*4);
     local ubyte ga = ReadUByte(startof(v)+sizeof(ubyte)*5);
     local ubyte ba = ReadUByte(startof(v)+sizeof(ubyte)*6);
-    SPrintf(s, "RGBA: #%02x%02x%02x%02x", (r + ra) * a, (g + ga) * a, (b + ba) * a, a);
-    return s;
+    
+    return Str("RGBA: #%02x%02x%02x%02x", (float) (r + ra) * a / 255, (float) (g + ga) * a / 255, (float) (b + ba) * a / 255, a);
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -421,9 +410,7 @@ typedef struct {
 string MatrixBankRead(MatrixBank& v) {
     local uint32 matrixCount = v.matrices.base.isPresent ? v.matrices.count : v.shortMatrices.count;
     
-    local string s;
-    SPrintf(s, "Matrix bank (M: %d, C: %d)", matrixCount, v.colorTransforms.count);
-    return s;
+    return Str("Matrix bank (M: %d, C: %d)", matrixCount, v.colorTransforms.count);
 };
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -443,9 +430,7 @@ typedef struct {
 } ShapePoint<read=ShapePointRead, size=(sizeof(float)*2+sizeof(ushort)*2)>;
 
 string ShapePointRead(ShapePoint& v) {
-    string s;
-    SPrintf(s, "%.2f, %.2f (%d, %d)", ReadFloat(startof(v)), ReadFloat(startof(v)+sizeof(float)), ReadUShort(startof(v)+sizeof(float)*2), ReadUShort(startof(v)+sizeof(float)*2+sizeof(ushort)));
-    return s;
+    return Str("%.2f, %.2f (%d, %d)", ReadFloat(startof(v)), ReadFloat(startof(v)+sizeof(float)), ReadUShort(startof(v)+sizeof(float)*2), ReadUShort(startof(v)+sizeof(float)*2+sizeof(ushort)));
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -493,9 +478,7 @@ typedef struct {
 } TextField<read=TextFieldRead>;
 
 string TextFieldRead(TextField& v) {
-    string s;
-    SPrintf(s, "TextField #%d", v.id);
-    return s;
+    return Str("TextField #%d", v.id);
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -523,9 +506,7 @@ typedef struct {
 } ShapeDrawBitmapCommand<read=ShapeDrawBitmapCommandRead, size=(4*sizeof(uint))>;
 
 string ShapeDrawBitmapCommandRead(ShapeDrawBitmapCommand& v) {
-    local string s;
-    SPrintf(s, "CMD (TX: %d): %d+%d", v.textureIndex, v.startingPointIndex, v.pointCount);
-    return s;
+    return Str("CMD (TX: %d): %d+%d", v.textureIndex, v.startingPointIndex, v.pointCount);
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -547,9 +528,7 @@ typedef struct {
 } Shape<read=ShapeRead, size=4>;
 
 string ShapeRead(Shape& v) {
-    string s;
-    SPrintf(s, "Shape #%d (%d commands)", v.id.value, v.commands.count);
-    return s;
+    return Str("Shape #%d (%d commands)", v.id.value, v.commands.count);
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -575,9 +554,7 @@ typedef struct {
 } MovieClipModifier<read=MovieClipModifierRead>;
 
 string MovieClipModifierRead(MovieClipModifier& v) {
-    string s;
-    SPrintf(s, "Modifier (%d) #%d", v.type, v.id);
-    return s;
+    return Str("Modifier (%d) #%d", v.type, v.id);
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -603,9 +580,7 @@ typedef struct {
 } MovieClipFrame<read=MovieClipFrameRead, size=(2*sizeof(uint32))>;
 
 string MovieClipFrameRead(MovieClipFrame& v) {
-    string s;
-    SPrintf(s, "Frame (SID: %d), %d", v.labelStringIndex, v.usedTransformsCount);
-    return s;
+    return Str("Frame (SID: %d), %d", v.labelStringIndex, v.usedTransformsCount);
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -622,9 +597,7 @@ typedef struct {
 } ShortMovieClipFrame<read=ShortMovieClipFrameRead, size=(sizeof(uint16))>;
 
 string ShortMovieClipFrameRead(MovieClipFrame& v) {
-    string s;
-    SPrintf(s, "Frame (SID: null), %d", v.usedTransformsCount);
-    return s;
+    return Str("Frame (SID: null), %d", v.usedTransformsCount);
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -657,10 +630,8 @@ typedef struct {
 } MovieClip<read=MovieClipRead, size=4>;
 
 string MovieClipRead(MovieClip& v) {
-    string s;
     // high load on cpu
-    SPrintf(s, "MovieClip #%d", v.id.value);
-    return s;
+    return Str("MovieClip #%d", v.id.value);
 }
 
 typedef struct (RootTable& rootTable, uint fieldIndex) {
@@ -692,7 +663,7 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
     Int16 width(table, 2);
     Int16 height(table, 3);
     ByteArray textureData(table, 4);
-    Int32 textureFilename(table, 5);  // offset to null-terminated string or string reference
+    StringRef textureFilename(table, 5);
     
     FSeek(table.descriptor.nextPosition);
 } Texture<read=TextureRead>;
@@ -702,9 +673,7 @@ string TextureRead(Texture& v) {
         return "Texture is not present";
     }
     
-    string s;
-    SPrintf(s, "Texture (%dx%d)", v.width.value, v.height.value);
-    return s;
+    return Str("Texture (%dx%d)", v.width.value, v.height.value);
 }
 
 typedef struct {
@@ -737,30 +706,30 @@ struct DataChunk (uint i) {
     local uint position = FTell();
 
     switch (i) {
-        case 0:
-            HeaderRoot header;
-            break;
-        case 1:
-            ExportNamesRoot exports;
-            break;
-        case 2:
-            TextFieldsRoot textFields;
-            break;
-        case 3:
-            ShapesRoot shapes;
-            break;
-        case 4:
-            MovieClipsRoot movieClips;
-            break;
-        case 5:
-            MovieClipModifiersRoot modifiers;
-            break;
-        case 6:
-            TexturesRoot textures;
-            break;
-        default:
-            char data[length];
-            break;
+    case 0:
+        HeaderRoot header;
+        break;
+    case 1:
+        ExportNamesRoot exports;
+        break;
+    case 2:
+        TextFieldsRoot textFields;
+        break;
+    case 3:
+        ShapesRoot shapes;
+        break;
+    case 4:
+        MovieClipsRoot movieClips;
+        break;
+    case 5:
+        MovieClipModifiersRoot modifiers;
+        break;
+    case 6:
+        TexturesRoot textures;
+        break;
+    default:
+        char data[length];
+        break;
     }
     
     FSeek(position + length);
