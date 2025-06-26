@@ -1,0 +1,659 @@
+//------------------------------------------------
+//--- 010 Editor v12.0.1 Binary Template
+//
+//      File: SCcom.bt
+//   Authors: fourk (github.com/FourCinnamon0), DaniilSV (github.com/Daniil-SV)
+//   Version: 1.2
+//   Purpose: SupercellSWF compressed assets.
+//  Category: Game
+// File Mask: *.sc
+//  ID Bytes: 53 43
+//   History: 
+//   1.2   2023-07-30 DaniilSV: Added Metadata.     
+//   1.1   2023-01-22 DaniilSV: Improved compression type detection.
+//   1.0   2023-01-05 DaniilSV: Bugfix. Added proper metadata chunk detection.
+//   0.9   2022-04-12 FourCinnamon0: Added LZMA info
+//   0.8   2021-11-11 FourCinnamon0: First released version
+//------------------------------------------------
+
+/* Comment format functions */
+
+string LZMA_props(ubyte& prop) {
+    local string s; local string t;
+    local ubyte lc, lp, pb;
+
+    if (prop > (4 * 5 + 4) * 9 + 8) {
+        t = "Invalid LZMA properties";
+    } else {
+        pb = prop / (9 * 5); // Position bits
+        lp = (prop - (pb * 9 * 5)) / 9;       // Literal position bits
+        lc = (prop - (pb * 9 * 5)) - lp * 9;  // Literal context bits
+        SPrintf(t, "Position bits: %d, Literal position bits: %d, Literal context bits: %d", pb, lp, lc);
+    }
+
+    return t;
+};
+
+string ScDataVersion(uint32& index) {
+    switch (index) {
+    case 1:
+        return "Has LZMA or LZHAM compression";
+    case 3:
+        return "Has ZSTD compression";
+    case 4:
+        return "Has metadata";
+    default:
+        return "Unknown";
+    }
+};
+
+/* Structs */
+
+typedef struct {
+    LittleEndian();
+
+    local uint32 header_ptr = FileSize() - 6;
+
+    FSeek(header_ptr);
+    char data_size_flags;
+
+    local uchar hash_data_field_size = 0;
+    local uint32 strings_data_array_ptr = 0;
+    local uchar unknown_bool = 1;
+
+    if ((data_size_flags & 0xFC) == 0x24) {
+        uchar field_size;
+
+        local uint32 header_data_ptr = header_ptr - field_size;
+
+        local char string_data_bits_offset = data_size_flags & 3;
+        local char data_field_size = 1 << (data_size_flags & 3);
+
+        FSeek(header_data_ptr);
+        if (field_size > 3) {
+            int data_info_offset;
+        } else if (field_size <= 1) {
+            uchar data_info_offset;
+        } else {
+            ushort data_info_offset;
+        }
+
+        local uint32 data_info_ptr = header_data_ptr - data_info_offset;
+
+        if (data_field_size > 3u) {
+            local uint32 strings_data_offset = 0xFFFFFFFD << string_data_bits_offset;
+            if (data_field_size >= 8u) {
+                local uint32 string_data_ptr = data_info_ptr + strings_data_offset;
+
+                FSeek(data_info_ptr - data_field_size);
+                uint32 asset_total_count;
+
+                data_field_size = 8;
+                field_hash_size = 8;
+
+                FSeek(string_data_ptr);
+                uint32 strings_array_offset;
+
+                strings_data_array_ptr = strings_data_offset - strings_array_offset;
+
+                unknown_bool = 0;
+
+                FSeek(string_data_ptr + 1 << (data_size_flags & 3));
+                char strings_field_size;
+            } else {
+                hash_data_field_size = 1 << (data_size_flags & 3);
+
+                FSeek(data_info_ptr - data_field_size);
+                uint32 asset_total_count;
+
+                FSeek(data_info_ptr + strings_data_offset + data_field_size);
+                uint32 strings_field_size;
+
+                FSeek(data_info_ptr + strings_data_offset);
+                uint32 strings_array_offset;
+
+                strings_data_array_ptr = data_info_ptr + (strings_data_offset - strings_array_offset);
+
+                unknown_bool = 0;
+            }
+        } else if (data_field_size > 1u) {
+            local uint32 strings_data_offset = data_info_ptr + (0xFFFFFFFD << string_data_bits_offset);
+            hash_data_field_size = 1 << (data_size_flags & 3);
+
+            FSeek(strings_data_offset);
+            ushort strings_array_offset;
+            strings_data_array_ptr = strings_data_offset - strings_array_offset;
+
+            FSeek(strings_data_offset + data_field_size);
+            ushort strings_field_size;
+
+            FSeek(data_info_ptr - data_field_size);
+            ushort asset_total_count;
+
+            unknown_bool = 1;
+        } else {
+            FSeek(data_info_ptr - data_field_size);
+            uchar asset_total_count;
+
+            FSeek(data_info_ptr + 0xFFFFFFFE);
+            uchar strings_field_size;
+
+            FSeek(data_info_ptr + 0xFFFFFFFD);
+            uchar strings_array_offset;
+
+            strings_data_array_ptr = data_info_ptr + (0xFFFFFFFD - strings_array_offset);
+
+            data_field_size = 1;
+            hash_data_field_size = 1;
+        }
+
+        if (!asset_total_count) return;
+    } else {
+        Assert(0, "Invalid file");
+    }
+
+    FSeek(strings_data_array_ptr - strings_field_size);
+    if (strings_field_size > 3) {
+        uint32 strings_total_count;
+    } else if (strings_field_size > 1) {
+        uint16 strings_total_count;
+    } else {
+        uchar strings_total_count;
+    }
+
+    FSeek(data_info_ptr - data_field_size);
+    if (unknown_bool) {
+        if (hash_data_field_size > 1u) {
+            ushort hash_total_count;
+        } else {
+            uchar hash_total_count;
+        }
+    } else {
+        uint32 hash_total_count;
+    }
+
+    local uint32 asset_index = 0;
+    local uint32 hash_flags_array_ptr = data_info_ptr + (hash_total_count * data_field_size);
+
+    while (asset_total_count > asset_index) {
+        struct ExportName {
+            local uint32 asset_export_names_ptr = strings_data_array_ptr + asset_index * strings_field_size;
+            if (strings_total_count > asset_index) {
+                FSeek(asset_export_names_ptr);
+                if (strings_field_size > 3) {
+                    uint32 asset_export_name_offset;
+                } else if (strings_field_size <= 1) {
+                    uchar asset_export_name_offset;
+                } else {
+                    ushort asset_export_name_offset;
+                }
+
+                FSeek(asset_export_names_ptr - asset_export_name_offset);
+                string export_name;
+            }
+
+            if (hash_total_count > asset_index) {
+                FSeek(hash_flags_array_ptr + asset_index);
+                uchar hash_data_flags;
+
+                local uchar is_valid_hash = hash_data_flags >> 2 == 0x19;
+                if (!is_valid_hash)
+                    is_valid_hash = hash_data_flags >> 2 == 5;
+                if (is_valid_hash) {
+                    local int hash_field_size = 1 << (hash_data_flags & 3);
+                    local uint32 hash_offset_array_ptr = data_info_ptr + (asset_index * data_field_size);
+
+                    FSeek(hash_offset_array_ptr);
+                    if (hash_data_field_size > 3u) {
+                        uint32 hash_offset;
+                    } else if (hash_data_field_size <= 1u) {
+                        uchar hash_offset;
+                    } else {
+                        uint16 hash_offset;
+                    }
+
+                    local uint32 hash_record_ptr = hash_offset_array_ptr - hash_offset;
+                    FSeek(hash_record_ptr - hash_field_size);
+                    if (hash_field_size > 3u) {
+                        uint32 hash_size;
+                    } else if (hash_field_size > 1u) {
+                        uint16 hash_size;
+                    } else {
+                        uchar hash_size;
+                    }
+
+                    char hash[hash_size] <format = hex>;
+                }
+            }
+
+            // This line is just to fix
+            // "Invalid structure. Ending position was in front of starting position."
+            // error
+            FSeek(FileSize());
+
+        } exportName <name = "Export Name Data", comment = export_name>;
+        asset_index++;
+    }
+} MetadataOld;
+
+typedef struct {
+    local uint startPosition = FTell();
+
+    local int32 offset = ReadInt(startPosition);
+    local uint nextPosition = FTell() + 4;
+    local uint position = startPosition + offset;
+} Indirect<read=IndirectRead>;
+
+string IndirectRead(Indirect &v) {
+    local string s;
+    SPrintf(s, "Position: %d", v.position);
+    return s;
+};
+
+typedef struct {
+    local uint position = FTell();
+    int vtableOffset;
+    local uint vtable = position - vtableOffset;
+    FSeek(vtable);
+    uint16 vtableSize;  // starting from here
+    uint16 tableDataSize;
+    local uint16 fieldCount = (vtableSize - 4) / 2;
+    uint16 fieldOffsets[fieldCount];
+} VTable <read=VTableValueRead, size=4>;
+
+string VTableValueRead(VTable &v) {
+    local string s;
+    SPrintf(s, "Field offset count: %d", v.fieldCount);
+    return s;
+};
+
+typedef struct {
+    Indirect descriptor;
+    if (descriptor.offset == 0) return;
+    
+    FSeek(descriptor.position);
+    VTable vtable;
+    FSeek(descriptor.position);
+} RootTable <bgcolor = 0xFFFF7F, size=4>;
+
+int GoToField(RootTable& rootTable, uint fieldIndex) {
+    if (fieldIndex < 0 || fieldIndex >= rootTable.vtable.fieldCount) {
+        return false;
+    }
+    
+    local int16 fieldOffset = rootTable.vtable.fieldOffsets[fieldIndex];
+    // Printf("fieldIndex: %d, fieldOffset: %d\n", fieldIndex, fieldOffset);
+    if (fieldOffset == 0) {
+        return false;
+    }
+    
+    FSeek(rootTable.descriptor.position + fieldOffset);
+    return true;
+};
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local int isPresent = GoToField(rootTable, fieldIndex);
+    if (!isPresent) {
+        local uint nextPosition = FTell();
+        local uint structOffset = 0;
+        return;
+    }
+    
+    local uint position = FTell();
+    uint structOffset;
+    local uint nextPosition = FTell();
+    local uint structPosition = position + structOffset;
+    FSeek(structPosition);
+} StructBase <read=StructBaseRead>;
+
+string StructBaseRead(StructBase &v) {
+    if (!v.isPresent) {
+        return "Value is not present";
+    }
+    
+    local string s = "";
+    SPrintf(s, "Position: %d", v.structPosition);
+    return s;
+};
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    // strT array[count];
+    FSeek(base.nextPosition);
+} Vector <read=VectorRead, bgcolor = 0xFFFFFF>;
+
+string VectorRead(Vector &v) {
+    if (!v.base.isPresent) {
+        return StructBaseRead(v.base);
+    }
+    
+    local string s = "";
+    SPrintf(s, "Element count: %d", v.count);
+    return s;
+};
+
+// Built-in types
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    byte array[count];
+    FSeek(base.nextPosition);
+} Int8Vector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    int16 array[count];
+    FSeek(base.nextPosition);
+} Int16Vector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    int32 array[count];
+    FSeek(base.nextPosition);
+} Int32Vector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    float array[count];
+    FSeek(base.nextPosition);
+} FloatVector;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        byte value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} Int8 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        ubyte value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} UInt8 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        int16 value;
+        FSeek(position);
+    } else {
+        local int16 value = 0; // "Value is not present";
+    }
+} Int16 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        uint16 value;
+        FSeek(position);
+    } else {
+        local uint16 value = 0; // "Value is not present";
+    }
+} UInt16 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        int32 value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} Int32 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        uint32 value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} UInt32 <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    local uint position = FTell();
+    local byte isPresent = GoToField(rootTable, fieldIndex);
+    if (isPresent) {
+        float value;
+        FSeek(position);
+    } else {
+        local string value = "Value is not present";
+    }
+} Float <read=value>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 length;
+    char array[length];
+    FSeek(base.nextPosition);
+} ByteArray<read=ByteArrayRead>;
+
+string ByteArrayRead(ByteArray& v) {
+    if (v.base.isPresent) {
+        string s;
+        SPrintf(s, "Byte Array [%d]", v.length);
+        return s;
+    }
+    
+    return "Not present";
+}
+
+// Strings
+
+typedef struct {
+    uint32 length;
+    char text[length];
+} String<read=StringRead>;
+
+string StringRead(String& v) {
+    if (v.length == 0) {
+        return "";
+    }
+    
+    return v.text;
+}
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    String value;
+    
+    FSeek(base.nextPosition);
+} StringRef<read=StringRefRead>;
+
+string StringRefRead(StringRef& v) {
+    if (!v.base.isPresent) {
+        return "";
+    }
+    
+    return StringRead(v.value);
+}
+
+typedef struct {
+    RootTable table;
+    
+    StringRef name(table, 0);
+    ByteArray hash(table, 1);
+    
+    FSeek(table.descriptor.nextPosition);
+} Export<size=(sizeof(RootTable))>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    Export array[count] <optimize=false>;
+    FSeek(base.nextPosition);
+} ExportVector;
+
+typedef struct {
+    RootTable table;
+
+    UInt32 translation_precision(table, 0);
+    UInt32 scale_precision(table, 1);
+    UInt32 shape_count(table, 2);
+    UInt32 movie_clips_count(table, 3);
+    UInt32 texture_count(table, 4);
+    UInt32 text_fields_count(table, 5);
+    Int32 u(table, 6);
+    Int32 resources_offset(table, 7);
+    Int32 objects_offset(table, 8);
+    Int32 texture_chunk_length(table, 9);
+    ExportVector exports(table, 10);
+    Int32 compressed_size(table, 11);
+    Int32 matrices_size(table, 12);
+    
+    FSeek(table.descriptor.nextPosition);
+} Metadata<size=(sizeof(RootTable))>;
+
+typedef struct {
+    RootTable table;
+    
+    Int32 index(table, 0);
+    Int32 someOffset(table, 1);
+    Int32 someSize(table, 2);  // accumulates with someOffset
+    Int32 u(table, 3);
+    Int32 u(table, 4);
+    Int32 u(table, 5);
+    Int32 u(table, 6);
+    Int32 u(table, 7);
+    Int32 u(table, 8);
+    Int32 u(table, 9);
+    Int32 u(table, 10);
+    Int32 u(table, 11);
+    Int32 u(table, 12);  // always 10 in ui
+    
+    FSeek(table.descriptor.nextPosition);
+} MatrixBank<size=(sizeof(RootTable))>;
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    MatrixBank array[count] <optimize=false>;
+    FSeek(base.nextPosition);
+} MatrixBankVector;
+
+BigEndian();
+
+struct FILE {
+    char magic[2] <name = "Magic Bytes", bgcolor = 0x00FF00>;
+    Assert(magic == "SC", "File magic is broken");
+
+    local uint32 version = 0;
+
+    uint32 fileVersion <name = "File version", comment = ScDataVersion>;
+
+    if (fileVersion == 4) {
+        uint32 dataVersion <name = "Data version", comment = ScDataVersion>;
+        version = dataVersion;
+    } else {
+        version = fileVersion;
+    }
+    
+    if (version <= 4) {
+        uint32 hash_size <name = "Hash Size">;
+        char hash[hash_size] <name = "Hash", format = hex>;
+    }
+
+    struct DATA {
+        local uint32 compressed_data_size = FileSize() - FTell();
+
+        if (fileVersion == 4 && false) {
+            local uint32 pos = FTell();
+
+            FSeek(FileSize() - 4);
+            uint metadata_size;
+
+            compressed_data_size -= metadata_size + 9;
+
+            // Metadata data <bgcolor = 0xFF0000>;
+            FSeek(pos);
+        }
+        
+        LittleEndian();
+        if (fileVersion == 0x05000000 || fileVersion == 0x06000000) {
+            if (fileVersion == 0x06000000) {
+                uint16 unknown;
+                
+                compressed_data_size -= 2;
+            }
+            
+            uint32 metadata_size;
+            Metadata metadata;
+            FSeek(metadata.table.descriptor.startPosition + metadata_size);
+            
+            if (metadata.compressed_size.isPresent) {
+                compressed_data_size = metadata.compressed_size.value;
+            } else {
+                compressed_data_size -= metadata_size + 4;
+            }
+        }
+
+        switch (version) {
+        case 1:
+            local uint compression_header = ReadUInt();
+
+            // if LZHAM header
+            if (compression_header == 1514947411) {
+                char lzham_header[4];
+                uchar dict_size;
+                uint32 uncompressed_size;
+                char compressed_data[compressed_data_size - 10] <name = "LZHAM compressed data", bgcolor = 0xFFFFFF>;
+            } else {
+                ubyte properties<name = "LZMA property", format = hex, comment = LZMA_props>;
+                uint32 dict_size;
+                uint32 uncompressed_size;
+                char compressed_data[compressed_data_size - 9] <name = "LZMA compressed data", bgcolor = 0xFFFFFF>;
+            }
+            break;
+        case 3:
+        case 0x05000000:
+        case 0x06000000:
+            char compressed_data[compressed_data_size] <name = "ZSTD compressed data", bgcolor = 0xFFFFFF>;
+            if (version == 0x06000000) {
+                int32 offset;
+                RootTable table;
+                MatrixBankVector matrix_banks(table, 0);
+            }
+            break;
+        default:
+            char compressed_data[compressed_data_size] <name = "Unknown compressed data type", bgcolor = 0xFFFFFF>;
+            break;
+        }
+    } data;
+} file;
