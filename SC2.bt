@@ -3,12 +3,13 @@
 //
 //      File: SC2.bt
 //   Authors: Vorono4ka
-//   Version: 1.2
+//   Version: 1.3
 //   Purpose: SC2 file format template (Supercell)
 //  Category: Misc
 // File Mask: *.sc, *.sc2
 //  ID Bytes: 
 //   History: 
+//   1.3   2025-03-11 Vorono4ka: Short Matrix2x3 and short MovieClipFrame added
 //   1.2   2024-11-07 Vorono4ka: MatrixBanks and Movie Clip structure are fixed
 //   1.1   2024-11-03 Vorono4ka: Texture type field fixed, Indirect+VTable replaced with RootTable, Indirect fix
 //   1.0   2024-11-03 Vorono4ka: Text field parsing implemented, not presented texture parsing fixed
@@ -346,35 +347,55 @@ string Matrix2x3Read(Matrix2x3& v) {
     return s;
 };
 
+typedef struct {
+    short a, b, c, d, x, y;
+} ShortMatrix2x3 <read=ShortMatrix2x3Read, size=(6*sizeof(float))>;
+
+string ShortMatrix2x3Read(ShortMatrix2x3& v) {
+    local string s;
+    SPrintf(s, "%.2f %.2f %.2f %.2f %.2f %.2f", (float) ReadShort(startof(v)) / 1024, (float) ReadShort(startof(v)+sizeof(short)) / 1024, (float) ReadShort(startof(v)+sizeof(short)*2) / 1024, (float) ReadShort(startof(v)+sizeof(short)*3) / 1024, (float) ReadShort(startof(v)+sizeof(short)*4) / 20, (float) ReadShort(startof(v)+sizeof(short)*5) / 20);
+    return s;
+};
+
 typedef struct (RootTable& rootTable, uint fieldIndex) {
     StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
     
     uint32 count;
     Matrix2x3 array[count];
     FSeek(base.nextPosition);
 } Matrix2x3Vector;
 
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    ShortMatrix2x3 array[count];
+    FSeek(base.nextPosition);
+} ShortMatrix2x3Vector;
+
 typedef struct {
-    ubyte redAddition;
-    ubyte greenAddition;
-    ubyte blueAddition;
+    ubyte red;
+    ubyte green;
+    ubyte blue;
 
     ubyte alpha;
 
-    ubyte redMultiplier;
-    ubyte greenMultiplier;
-    ubyte blueMultiplier;
+    ubyte redAddition;
+    ubyte greenAddition;
+    ubyte blueAddition;
 } ColorTransform <read=ColorTransformRead, size=(7*sizeof(ubyte))>;
 
 string ColorTransformRead(ColorTransform& v) {
     local string s;
-    local ubyte ra = ReadUByte(startof(v)+sizeof(ubyte));
-    local ubyte ga = ReadUByte(startof(v)+sizeof(ubyte)*1);
-    local ubyte ba = ReadUByte(startof(v)+sizeof(ubyte)*2);
+    local ubyte r = ReadUByte(startof(v)+sizeof(ubyte));
+    local ubyte g = ReadUByte(startof(v)+sizeof(ubyte)*1);
+    local ubyte b = ReadUByte(startof(v)+sizeof(ubyte)*2);
     local ubyte a = ReadUByte(startof(v)+sizeof(ubyte)*3);
-    local ubyte r = ReadUByte(startof(v)+sizeof(ubyte)*4);
-    local ubyte g = ReadUByte(startof(v)+sizeof(ubyte)*5);
-    local ubyte b = ReadUByte(startof(v)+sizeof(ubyte)*6);
+    local ubyte ra = ReadUByte(startof(v)+sizeof(ubyte)*4);
+    local ubyte ga = ReadUByte(startof(v)+sizeof(ubyte)*5);
+    local ubyte ba = ReadUByte(startof(v)+sizeof(ubyte)*6);
     SPrintf(s, "RGBA: #%02x%02x%02x%02x", (r + ra) * a, (g + ga) * a, (b + ba) * a, a);
     return s;
 };
@@ -393,12 +414,15 @@ typedef struct {
     
     Matrix2x3Vector matrices(rootTable, 0);
     ColorTransformVector colorTransforms(rootTable, 1);
+    ShortMatrix2x3Vector shortMatrices(rootTable, 2);
     FSeek(rootTable.descriptor.nextPosition);
 } MatrixBank<read=MatrixBankRead>;
 
 string MatrixBankRead(MatrixBank& v) {
+    local uint32 matrixCount = v.matrices.base.isPresent ? v.matrices.count : v.shortMatrices.count;
+    
     local string s;
-    SPrintf(s, "Matrix bank (M: %d, C: %d)", v.matrices.count, v.colorTransforms.count);
+    SPrintf(s, "Matrix bank (M: %d, C: %d)", matrixCount, v.colorTransforms.count);
     return s;
 };
 
@@ -594,6 +618,25 @@ typedef struct (RootTable& rootTable, uint fieldIndex) {
 } MovieClipFrameVector;
 
 typedef struct {
+    uint16 usedTransformsCount;
+} ShortMovieClipFrame<read=ShortMovieClipFrameRead, size=(sizeof(uint16))>;
+
+string ShortMovieClipFrameRead(MovieClipFrame& v) {
+    string s;
+    SPrintf(s, "Frame (SID: null), %d", v.usedTransformsCount);
+    return s;
+}
+
+typedef struct (RootTable& rootTable, uint fieldIndex) {
+    StructBase base(rootTable, fieldIndex);
+    if (!base.isPresent) return;
+    
+    uint32 count;
+    ShortMovieClipFrame array[count];
+    FSeek(base.nextPosition);
+} ShortMovieClipFrameVector;
+
+typedef struct {
     RootTable table;
     
     UInt16 id(table, 0);
@@ -608,6 +651,7 @@ typedef struct {
     UInt32 frameElementOffset(table, 9);  // or start frame element index, TODO: determine whether it bytes or not
     UInt16 matrixBankIndex(table, 10);  // first byte of fps short. this.fps = ((u10 & 0x7F) << 8) | this.fps & 0x80FF
     UInt32 scalingGridIndex(table, 11);
+    ShortMovieClipFrameVector shortFrames(table, 12);
     
     FSeek(table.descriptor.nextPosition);
 } MovieClip<read=MovieClipRead, size=4>;
